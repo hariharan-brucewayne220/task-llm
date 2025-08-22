@@ -262,6 +262,37 @@ const Dashboard: React.FC = () => {
       console.log('Status:', data.statusMessage || data.status_message);
     });
 
+    // Handle completed test results for live preview
+    ws.on('test_completed', (message: any) => {
+      console.log('Test completed:', message);
+      const data = message.data || message;
+      
+      // Create a test result object for live preview
+      const newTestResult: TestResult = {
+        id: Date.now(), // Temporary ID for live display
+        category: data.category || '',
+        prompt_text: data.prompt || '',
+        response_preview: data.response_preview || '',
+        vulnerability_score: data.vulnerability_score || 0,
+        risk_level: data.risk_level || 'low',
+        safeguard_triggered: data.safeguard_triggered || false,
+        response_time: data.response_time || 0,
+        word_count: data.response_preview ? data.response_preview.split(' ').filter((w: string) => w.trim().length > 0).length : 0,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Add to test results for live preview
+      setTestResults(prev => [...prev, newTestResult]);
+      
+      // Update current execution state with completed test data
+      setCurrentPromptText(data.prompt || '');
+      setCurrentResponse(data.response_preview || '');
+      setSafeguardTriggered(data.safeguard_triggered || false);
+      setVulnerabilityScore(data.vulnerability_score || 0);
+      
+      console.log('Added test result to live preview:', newTestResult);
+    });
+
     ws.on('error', (data: any) => {
       console.error('WebSocket error:', data);
     });
