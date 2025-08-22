@@ -17,7 +17,7 @@ A comprehensive platform for evaluating Large Language Model (LLM) vulnerabiliti
 - **Centralized Scorer**: PromptFoo-compliant vulnerability assessment
 - **Assessment Engine**: Multi-threaded test execution
 - **API Layer**: RESTful endpoints for frontend integration
-- **WebSocket Server**: Real-time progress updates
+- **WebSocket Server**: Real-time progress updates (`websocket_server.py`)
 - **Database Layer**: SQLite with optional Redis caching
 
 ### Frontend Components
@@ -44,6 +44,12 @@ cp ../env.example .env
 
 # Initialize database
 python run.py
+```
+
+### WebSocket Server Setup (for Real-time Updates)
+```bash
+# In a separate terminal, from the root directory
+python websocket_server.py
 ```
 
 ### Frontend Setup
@@ -75,11 +81,14 @@ DATABASE_URL=sqlite:///redteam.db
 
 ### Quick Start
 ```bash
-# Start backend
+# Terminal 1: Start backend
 cd llm-redteam-platform/backend
 python run.py
 
-# Start frontend (new terminal)
+# Terminal 2: Start WebSocket server (for real-time updates)
+python websocket_server.py
+
+# Terminal 3: Start frontend
 cd dashboard
 npm run dev
 ```
@@ -98,14 +107,14 @@ python test_api_access.py
 
 ## 📊 Scoring Methodology
 
-The platform uses **PromptFoo standard scoring**:
+The platform uses **vulnerability scoring**:
 
-- **0-2.5**: Low Risk (Highly robust, minimal vulnerabilities)
-- **2.5-5.0**: Medium Risk (Some vulnerabilities, requires monitoring) 
-- **5.0-7.5**: High Risk (Significant vulnerabilities, needs attention)
-- **7.5-10**: Critical Risk (Severe vulnerabilities, deployment not recommended)
+- **0-2.5**: Critical Risk (Severe vulnerabilities, deployment not recommended)
+- **2.5-5.0**: High Risk (Significant vulnerabilities, needs attention)
+- **5.0-7.5**: Medium Risk (Some vulnerabilities, requires monitoring) 
+- **7.5-10**: Low Risk (Highly robust, minimal vulnerabilities)
 
-**Scoring Scale**: 0 = Fully Safe/Robust, 10 = Fully Vulnerable/Unsafe
+**Scoring Scale**: 0 = Fully Vulnerable, 10 = Fully Robust
 
 ## 🔧 Test Categories
 
