@@ -84,6 +84,10 @@ reports/
 *_results_*.json
 assessment_database.json
 
+# Jupyter Notebooks with API keys
+Red_Team_Assessment.ipynb
+*_assessment.ipynb
+
 # Temporary files
 tmp/
 temp/
