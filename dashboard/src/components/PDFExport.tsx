@@ -85,15 +85,17 @@ const PDFExport: React.FC<PDFExportProps> = ({
       
       if (metrics) {
         // Calculate total tests from category breakdown
-        const totalTests = Object.values(metrics.category_breakdown).reduce((sum, category) => sum + category.total_tests, 0);
+        const totalTests = metrics.category_breakdown 
+          ? Object.values(metrics.category_breakdown).reduce((sum, category: any) => sum + (category.total_tests || 0), 0)
+          : metrics.total_tests || 0;
         
         const summary = [
-          `Assessment Status: ${assessmentStatus.status}`,
+          `Assessment Status: ${assessmentStatus?.status || 'Unknown'}`,
           `Total Tests: ${totalTests}`,
-          `Safeguard Success Rate: ${metrics.safeguard_success_rate}%`,
-          `Overall Vulnerability Score: ${metrics.overall_vulnerability_score}/10`,
-          `Average Response Time: ${metrics.average_response_time}s`,
-          `Average Response Length: ${metrics.average_response_length} words`
+          `Safeguard Success Rate: ${metrics.safeguard_success_rate || 0}%`,
+          `Overall Vulnerability Score: ${metrics.overall_vulnerability_score || 0}/10`,
+          `Average Response Time: ${metrics.average_response_time || 0}s`,
+          `Average Response Length: ${metrics.average_response_length || 0} words`
         ];
         
         summary.forEach(line => {
@@ -156,8 +158,11 @@ const PDFExport: React.FC<PDFExportProps> = ({
         const imgWidth = pageWidth - 40;
         const imgHeight = (imgWidth * 3) / 4; // 4:3 aspect ratio
         
-        pdf.addImage(chartImages.metricsRadialChart || chartImages.metricsBarChart, 'PNG', 20, yPosition, imgWidth, imgHeight);
-        yPosition += imgHeight + 10;
+        const chartImage = chartImages.metricsRadialChart || chartImages.metricsBarChart;
+        if (chartImage) {
+          pdf.addImage(chartImage, 'PNG', 20, yPosition, imgWidth, imgHeight);
+          yPosition += imgHeight + 10;
+        }
       }
 
       // Model Comparison Charts Section
@@ -261,15 +266,15 @@ const PDFExport: React.FC<PDFExportProps> = ({
           }
           
           pdf.setFont('helvetica', 'bold');
-          pdf.text(`${model.provider}/${model.model}`, 20, yPosition);
+          pdf.text(`${model.provider || 'Unknown'}/${model.model_name || model.model || 'Unknown'}`, 20, yPosition);
           yPosition += 7;
           
           pdf.setFont('helvetica', 'normal');
           const modelMetrics = [
-            `  Safeguard Rate: ${model.safeguard_success_rate.toFixed(2)}%`,
-            `  Vulnerability Score: ${model.overall_vulnerability_score.toFixed(2)}/10`,
-            `  Response Time: ${model.average_response_time.toFixed(2)}s`,
-            `  Response Length: ${model.average_response_length.toFixed(0)} words`
+            `  Safeguard Rate: ${(model.safeguard_success_rate || 0).toFixed(2)}%`,
+            `  Vulnerability Score: ${(model.overall_vulnerability_score || 0).toFixed(2)}/10`,
+            `  Response Time: ${(model.average_response_time || 0).toFixed(2)}s`,
+            `  Response Length: ${(model.average_response_length || 0).toFixed(0)} words`
           ];
           
           modelMetrics.forEach(metric => {

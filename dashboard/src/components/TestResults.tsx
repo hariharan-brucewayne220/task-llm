@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronRightIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 import { TestResult } from '../types';
 
 interface TestResultsProps {
@@ -39,12 +39,121 @@ const TestResults: React.FC<TestResultsProps> = ({ results }) => {
       : { text: '❌ Not Triggered', color: 'text-red-600 bg-red-100' };
   };
 
+  const exportToCSV = () => {
+    const headers = [
+      'Category',
+      'Vulnerability Score',
+      'Risk Level',
+      'Safeguard Status',
+      'Response Time',
+      'Word Count',
+      'Timestamp',
+      'Prompt',
+      'Response'
+    ];
+
+    const csvData = results.map(result => [
+      result.category,
+      (result.vulnerability_score || 0).toFixed(2),
+      getVulnerabilityLabel(result.vulnerability_score),
+      result.safeguard_triggered ? 'Triggered' : 'Not Triggered',
+      (result.response_time || 0).toFixed(2) + 's',
+      result.word_count || (result.response_preview?.split(' ').filter(word => word.trim().length > 0).length) || 0,
+      new Date(result.timestamp).toLocaleString(),
+      (result.prompt || 'N/A').replace(/,/g, ';').replace(/"/g, '""'),
+      (result.response_preview || result.full_response || 'N/A').replace(/,/g, ';').replace(/"/g, '""')
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `test-results-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const exportToPDF = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+      
+      // Send results to backend for PDF generation
+      const response = await fetch(`${apiUrl}/api/export/pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          results: results.map(result => ({
+            category: result.category,
+            vulnerability_score: result.vulnerability_score,
+            risk_level: getVulnerabilityLabel(result.vulnerability_score),
+            safeguard_triggered: result.safeguard_triggered,
+            response_time: result.response_time,
+            word_count: result.word_count || (result.response_preview?.split(' ').filter(word => word.trim().length > 0).length) || 0,
+            timestamp: result.timestamp,
+            prompt: result.prompt || 'N/A',
+            response: result.response_preview || result.full_response || 'N/A'
+          })),
+          export_type: 'detailed_results'
+        })
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `test-results-${new Date().toISOString().split('T')[0]}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        console.error('Failed to generate PDF');
+        alert('Failed to generate PDF. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error generating PDF. Please try again.');
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg border border-gray-200">
-      <div className="px-6 py-4 border-b border-gray-200">
+      <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-900">
           Detailed Test Results ({results.length} tests)
         </h3>
+        
+        {results.length > 0 && (
+          <div className="flex space-x-3">
+            <button
+              onClick={exportToCSV}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <DocumentArrowDownIcon className="h-4 w-4 mr-2" />
+              Export CSV
+            </button>
+            
+            <button
+              onClick={exportToPDF}
+              className="inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <DocumentArrowDownIcon className="h-4 w-4 mr-2" />
+              Export PDF
+            </button>
+          </div>
+        )}
       </div>
       
       <div className="overflow-x-auto">
@@ -114,7 +223,7 @@ const TestResults: React.FC<TestResultsProps> = ({ results }) => {
                     })()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {result.response_time.toFixed(2)}s
+                    {(result.response_time || 0).toFixed(2)}s
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {result.word_count || (result.response_preview?.split(' ').filter(word => word.trim().length > 0).length) || 0}
@@ -134,7 +243,7 @@ const TestResults: React.FC<TestResultsProps> = ({ results }) => {
                           <h4 className="text-sm font-medium text-gray-900 mb-2">Prompt:</h4>
                           <div className="bg-white border border-gray-200 rounded-md p-3">
                             <p className="text-sm text-gray-700">
-                              {result.prompt || result.prompt_text || result.currentPromptText || result.current_prompt_preview || 'No prompt data available'}
+                              {result.prompt || 'No prompt data available'}
                             </p>
                           </div>
                         </div>
@@ -144,7 +253,7 @@ const TestResults: React.FC<TestResultsProps> = ({ results }) => {
                           <h4 className="text-sm font-medium text-gray-900 mb-2">Response:</h4>
                           <div className="bg-white border border-gray-200 rounded-md p-3">
                             <p className="text-sm text-gray-700">
-                              {result.response_preview || result.response_text || result.currentResponse || result.current_response || result.full_response || 'No response data available'}
+                              {result.response_preview || result.full_response || 'No response data available'}
                             </p>
                           </div>
                         </div>
@@ -178,7 +287,7 @@ const TestResults: React.FC<TestResultsProps> = ({ results }) => {
                           <div className="bg-white border border-gray-200 rounded-md p-3">
                             <h5 className="text-xs font-medium text-gray-500 uppercase mb-1">Performance</h5>
                             <p className="text-sm text-gray-900">
-                              Response time: {result.response_time.toFixed(2)}s<br />
+                              Response time: {(result.response_time || 0).toFixed(2)}s<br />
                               Word count: {result.word_count || (result.response_preview?.split(' ').filter(word => word.trim().length > 0).length) || 0} words
                             </p>
                           </div>

@@ -135,6 +135,11 @@ def handle_start_assessment(data=None):
         if data and isinstance(data, dict):
             provider = data.get('selectedProvider', 'openai')
             model = data.get('selectedModel', 'gpt-3.5-turbo')
+            
+            # Get API key from nested apiKeys object
+            api_keys = data.get('apiKeys', {})
+            api_key = api_keys.get(provider, '') if api_keys else data.get('apiKey', '')
+            
             config = data.get('assessmentConfig', {})
             categories = config.get('testCategories', ['jailbreak', 'bias'])
             total_prompts = config.get('assessmentScope', {}).get('totalPrompts', 20)
@@ -143,9 +148,15 @@ def handle_start_assessment(data=None):
             # Default values
             provider = 'openai'
             model = 'gpt-3.5-turbo'
+            api_key = ''
             categories = ['jailbreak', 'bias']
             total_prompts = 20
             assessment_name = 'Quick Assessment'
+            
+        # Validate API key is provided
+        if not api_key:
+            emit('error', {'message': 'API key is required to start assessment'})
+            return
         
         # Calculate prompts per category
         prompts_per_category = max(1, total_prompts // len(categories))
@@ -178,9 +189,13 @@ def handle_start_assessment(data=None):
             'message': 'Assessment started successfully'
         })
         
-        # Start the real assessment using the assessment service
+        # Test: Send a simple test event immediately
+        emit('test_event', {'message': 'Test event from start_assessment handler'})
+        print(f"SENT test_event to client {client_id}")
+        
+        # Start the real assessment using the assessment service with API key
         from app.services.assessment import AssessmentService
-        AssessmentService.run_assessment_async(assessment.id)
+        AssessmentService.run_assessment_async(assessment.id, api_key=api_key)
         
 
         
@@ -297,6 +312,14 @@ def get_assessment_subscribers(assessment_id):
 
 def send_assessment_update(assessment_id, event_type, data):
     """Send assessment update via WebSocket."""
+    # Import socketio with error handling for background threads
+    try:
+        from app import socketio
+    except ImportError:
+        # Fallback for background threads
+        from flask import current_app
+        socketio = current_app.extensions['socketio']
+    
     # Send to specific room AND broadcast globally for dashboard
     message_data = {
         'assessment_id': assessment_id,
@@ -304,11 +327,24 @@ def send_assessment_update(assessment_id, event_type, data):
         'timestamp': datetime.now().isoformat()
     }
     
+    # Debug logging and validation for test_completed events
+    if event_type == 'test_completed':
+        print(f"DEBUG send_assessment_update test_completed data: {data}")
+        if 'category' in data and 'prompt' not in data:
+            print(f"WARNING: test_completed event missing 'prompt' field! Adding fallback. Data: {data}")
+            # Add fallback prompt text to prevent frontend errors
+            data['prompt'] = f"{data.get('category', 'unknown')} test prompt"
+            message_data['data'] = data
+    
     # Send to specific assessment room
     socketio.emit(event_type, message_data, room=f'assessment_{assessment_id}')
     
     # Also broadcast globally so dashboard receives it
     socketio.emit(event_type, message_data)
+    
+    # Additional debug: Force send to all connected clients
+    for client_id in active_connections.keys():
+        socketio.emit(event_type, message_data, to=client_id)
     
     print(f"WEBSOCKET SEND: {event_type} for assessment {assessment_id}")
     print(f"Connected clients: {len(active_connections)}")

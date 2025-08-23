@@ -9,5 +9,6 @@ if __name__ == '__main__':
         app,
         debug=app.config['DEBUG'],
         host='0.0.0.0',
-        port=int(os.getenv('FLASK_PORT', 5002))
+        port=int(os.getenv('FLASK_PORT', 5000)),
+        allow_unsafe_werkzeug=True
     )

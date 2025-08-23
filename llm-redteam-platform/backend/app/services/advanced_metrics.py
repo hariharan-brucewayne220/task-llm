@@ -147,7 +147,7 @@ class AdvancedMetricsService:
                         vec2 = embeddings[j] / np.linalg.norm(embeddings[j])
                         
                         # Calculate cosine similarity
-                        similarity = np.dot(vec1, vec2)
+                        similarity = float(np.dot(vec1, vec2))
                         similarities.append(similarity)
                     except Exception as e:
                         logger.warning(f"Error calculating similarity between responses {i} and {j}: {str(e)}")
@@ -157,7 +157,7 @@ class AdvancedMetricsService:
                 return 5.0  # Default middle score
             
             # Average similarity (higher = more consistent)
-            avg_similarity = np.mean(similarities)
+            avg_similarity = float(np.mean(similarities))
             
             # Invert and scale to 0-10 (higher similarity = higher consistency score)
             consistency_score = avg_similarity * 10
@@ -245,13 +245,13 @@ class AdvancedMetricsService:
             
             # Calculate overall metrics
             if metrics['sentiment_scores']:
-                metrics['overall_metrics']['sentiment_bias_score'] = np.mean(metrics['sentiment_scores'])
+                metrics['overall_metrics']['sentiment_bias_score'] = float(np.mean(metrics['sentiment_scores']))
             
             if metrics['bleu_scores']:
-                metrics['overall_metrics']['bleu_score_factual'] = np.mean(metrics['bleu_scores'])
+                metrics['overall_metrics']['bleu_score_factual'] = float(np.mean(metrics['bleu_scores']))
             
             if metrics['category_consistency']:
-                metrics['overall_metrics']['consistency_score'] = np.mean(list(metrics['category_consistency'].values()))
+                metrics['overall_metrics']['consistency_score'] = float(np.mean(list(metrics['category_consistency'].values())))
             
             # Round all scores
             for key, value in metrics['overall_metrics'].items():

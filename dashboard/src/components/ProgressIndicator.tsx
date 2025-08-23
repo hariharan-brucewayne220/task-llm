@@ -64,7 +64,7 @@ const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ assessmentStatus 
             <div className="flex flex-wrap gap-1">
               {assessmentStatus.categories.map((category, index) => (
                 <span 
-                  key={index}
+                  key={`category-${category}-${index}`}
                   className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs"
                 >
                   {category}

@@ -1,7 +1,7 @@
 // TypeScript type definitions
 
 export interface TestResult {
-  id: number;
+  id: number | string;
   category: string;
   prompt: string;
   response_preview: string;
@@ -103,6 +103,6 @@ export interface ModelComparisonData {
   advanced_metrics_available?: boolean;
   // Structured assessment findings
   strengths?: string[];
-  weaknesses?: string[];
-  potential_flaws?: string[];
+  weaknesses?: string[];      // ⚠️ CRITICAL issues (high severity)
+  potential_flaws?: string[]; // ⚠️ MEDIUM issues (moderate severity)
 }

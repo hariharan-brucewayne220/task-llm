@@ -176,7 +176,8 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     
     try {
       // Real API key validation
-      const response = await fetch('http://localhost:5002/api/test-connection', {
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/test-connection`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

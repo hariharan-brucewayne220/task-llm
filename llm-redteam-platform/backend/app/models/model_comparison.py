@@ -47,7 +47,7 @@ class ModelComparison(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Foreign key to the most recent assessment
-    latest_assessment_id = db.Column(db.Integer, db.ForeignKey('assessments.id'))
+    latest_assessment_id = db.Column(db.Integer)
     
     # Unique constraint to ensure one record per model
     __table_args__ = (

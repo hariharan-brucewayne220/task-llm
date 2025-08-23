@@ -9,7 +9,7 @@ interface UseWebSocketReturn {
   sendMessage: (type: string, data: any) => void;
 }
 
-export const useWebSocket = (url: string = 'http://localhost:5002'): UseWebSocketReturn => {
+export const useWebSocket = (url: string = 'http://localhost:5000'): UseWebSocketReturn => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);

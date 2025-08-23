@@ -22,6 +22,7 @@ interface HistoricalComparisonProps {
     overall_vulnerability_score: number;
     high_risk_findings?: number;
     total_tests?: number;
+    category_breakdown?: Record<string, any>;
   };
   modelName?: string;
 }

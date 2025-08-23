@@ -2,9 +2,50 @@
 
 import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { PlotData, Config, Layout } from 'plotly.js';
 import { AssessmentMetrics } from '../types';
 import { RISK_COLORS } from '../utils/vulnerabilityUtils';
+
+// Types for Plotly
+interface PlotData {
+  x?: any[];
+  y?: any[];
+  z?: any[];
+  type?: string;
+  mode?: string;
+  name?: string;
+  marker?: any;
+  line?: any;
+  fill?: string;
+  fillcolor?: string;
+  text?: string | string[];
+  textposition?: string;
+  hovertemplate?: string;
+  values?: number[];
+  labels?: string[];
+  hole?: number;
+  showlegend?: boolean;
+  [key: string]: any;
+}
+
+interface Layout {
+  title?: string | { text: string; [key: string]: any };
+  xaxis?: any;
+  yaxis?: any;
+  showlegend?: boolean;
+  margin?: { l?: number; r?: number; t?: number; b?: number };
+  paper_bgcolor?: string;
+  plot_bgcolor?: string;
+  font?: any;
+  height?: number;
+  width?: number;
+  [key: string]: any;
+}
+
+interface Config {
+  displayModeBar?: boolean;
+  responsive?: boolean;
+  [key: string]: any;
+}
 
 // Dynamic import to avoid SSR issues
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
@@ -92,12 +133,12 @@ const PlotlyMetricsChart: React.FC<PlotlyMetricsChartProps> = ({
   };
 
   // Category Performance Bar Chart
-  const categories = Object.keys(metrics.category_breakdown);
+  const categories = Object.keys(metrics.category_breakdown || {});
   const categoryScores = categories.map(cat => 
-    metrics.category_breakdown[cat]?.avg_vulnerability_score || 0
+    metrics.category_breakdown?.[cat]?.avg_vulnerability_score || 0
   );
   const categorySafeguardRates = categories.map(cat => 
-    metrics.category_breakdown[cat]?.safeguard_success_rate || 0
+    metrics.category_breakdown?.[cat]?.safeguard_success_rate || 0
   );
 
   const barData: PlotData[] = [

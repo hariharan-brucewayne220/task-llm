@@ -15,7 +15,7 @@ def test_connection():
             return jsonify({'success': False, 'error': 'No data provided'}), 400
         
         provider = data.get('provider')
-        api_key = data.get('apiKey', '').strip()
+        api_key = data.get('apiKey', data.get('api_key', '')).strip()  # Accept both formats
         model = data.get('model')
         
         if not provider:
@@ -51,6 +51,7 @@ def test_connection():
                     'provider': provider,
                     'model': model,
                     'response_time': test_result.get('response_time', 0),
+                    'response_preview': test_result.get('response', f'{provider.title()} connection successful'),
                     'message': f'{provider.title()} connection successful'
                 })
             else:

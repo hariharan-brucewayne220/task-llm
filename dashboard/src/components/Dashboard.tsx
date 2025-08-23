@@ -40,6 +40,7 @@ const Dashboard: React.FC = () => {
   const [vulnerabilityScore, setVulnerabilityScore] = useState(0);
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
+  const [actualResponseTimes, setActualResponseTimes] = useState<number[]>([]);
 
   // WebSocket connection
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -50,12 +51,12 @@ const Dashboard: React.FC = () => {
     try {
       console.log('Fetching recent assessments from API...');
       const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/assessments/historical`);
+      const response = await fetch(`${apiUrl}/api/model-comparisons/assessment-history`);
       if (response.ok) {
         const data = await response.json();
         console.log('API Response:', data);
-        setRecentAssessments(data.assessments || []);
-        console.log('Set recent assessments:', data.assessments?.length || 0);
+        setRecentAssessments(data.history || []);
+        console.log('Set recent assessments:', data.history?.length || 0);
       } else {
         console.error('API request failed:', response.status, response.statusText);
       }
@@ -77,33 +78,43 @@ const Dashboard: React.FC = () => {
         setTestResults(resultsData.results || []);
       }
       
-      // Fetch metrics
-      const metricsResponse = await fetch(`${apiUrl}/api/assessments/historical`);
+      // Fetch metrics from model comparisons
+      const metricsResponse = await fetch(`${apiUrl}/api/model-comparisons`);
       if (metricsResponse.ok) {
         const metricsData = await metricsResponse.json();
-        setMetrics(metricsData.metrics);
+        if (metricsData.success && metricsData.comparisons && metricsData.comparisons.length > 0) {
+          // Use the latest model's data as metrics
+          const latestModel = metricsData.comparisons[0];
+          setMetrics({
+            safeguard_success_rate: latestModel.safeguard_success_rate,
+            average_response_time: latestModel.average_response_time,
+            average_response_length: latestModel.average_response_length,
+            overall_vulnerability_score: latestModel.overall_vulnerability_score,
+            risk_distribution: latestModel.risk_distribution,
+            category_breakdown: latestModel.category_breakdown || {}
+          });
+        }
         
-        // Create model comparison data from metrics
-        const modelComparison: ModelComparisonData = {
-          model: metricsData.assessment?.model_name || 'Unknown',
-          provider: metricsData.assessment?.llm_provider || 'Unknown',
-          safeguard_success_rate: metricsData.metrics?.safeguard_success_rate || 0,
-          overall_vulnerability_score: metricsData.metrics?.overall_vulnerability_score || 0,
-          average_response_time: metricsData.metrics?.average_response_time || 0,
-          average_response_length: metricsData.metrics?.average_response_length || 0,
-          category_breakdown: metricsData.metrics?.category_breakdown || {},
-          risk_distribution: metricsData.metrics?.risk_distribution || {
-            low: 0,
-            medium: 0,
-            high: 0,
-            critical: 0
-          },
-          strengths: metricsData.metrics?.strengths || [],
-          weaknesses: metricsData.metrics?.weaknesses || [],
-          potential_flaws: metricsData.metrics?.potential_flaws || []
-        };
+        // Create model comparison data from API response
+        const modelComparisons = metricsData.comparisons.map((model: any): ModelComparisonData => ({
+          model: model.model_name || 'Unknown',
+          provider: model.provider || 'Unknown',
+          safeguard_success_rate: model.safeguard_success_rate || 0,
+          overall_vulnerability_score: model.overall_vulnerability_score || 0,
+          average_response_time: model.average_response_time || 0,
+          average_response_length: model.average_response_length || 0,
+          risk_distribution: model.risk_distribution || { low: 0, medium: 0, high: 0, critical: 0 },
+          category_breakdown: model.category_breakdown || {},
+          bleu_score_factual: model.bleu_score_factual,
+          sentiment_bias_score: model.sentiment_bias_score,
+          consistency_score: model.consistency_score,
+          advanced_metrics_available: model.advanced_metrics_available || false,
+          strengths: model.strengths || [],
+          weaknesses: model.weaknesses || [],
+          potential_flaws: model.potential_flaws || []
+        }));
         
-        setModelComparisons([modelComparison]);
+        setModelComparisons(modelComparisons);
         
         console.log('Assessment results loaded successfully');
         setCurrentStep('results');
@@ -114,7 +125,7 @@ const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    // Initialize WebSocket connection
+    // Initialize WebSocket connection  
     const backendUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'http://localhost:5000';
     const ws = io(backendUrl, {
       autoConnect: false,
@@ -129,6 +140,16 @@ const Dashboard: React.FC = () => {
     
     ws.on('connect', () => {
       console.log('Socket.IO connected');
+    });
+
+    // Debug: Listen for ALL events
+    ws.onAny((eventName: string, ...args: any[]) => {
+      console.log('🔥 ANY WebSocket event received:', eventName, args);
+    });
+
+    // Test event listener
+    ws.on('test_event', (data: any) => {
+      console.log('🧪 TEST EVENT RECEIVED:', data);
     });
 
     ws.on('connect_error', (error) => {
@@ -214,12 +235,7 @@ const Dashboard: React.FC = () => {
       }
     });
 
-    ws.on('test_completed', (message: any) => {
-      console.log('Test completed:', message);
-      const data = message.data || message; // Handle wrapped data structure
-      // This event provides progress info, not full results
-      // Full results come via test_result event
-    });
+    // Removed duplicate test_completed listener - handled below at line 266
 
     ws.on('metrics_update', (message: any) => {
       console.log('Metrics update:', message);
@@ -233,8 +249,45 @@ const Dashboard: React.FC = () => {
       setModelComparisons(prev => [...prev, data.comparison || data]);
     });
 
-    ws.on('execution_update', (data: any) => {
-      handleExecutionUpdate(data);
+    // Handle progress updates from backend
+    ws.on('progress_update', (message: any) => {
+      console.log('Progress update received:', message);
+      const data = message.data || message; // Handle wrapped data structure
+      
+      setCurrentPrompt(data.current_prompt || 0);
+      setTotalPrompts(data.total_prompts || 0);
+      setCurrentCategory(data.current_category || '');
+      setCurrentPromptText(data.current_prompt_preview || '');
+      
+      // Update estimated time based on prompts completed
+      if (data.total_prompts) {
+        const promptsRemaining = data.total_prompts - data.current_prompt;
+        
+        // Use actual response times if available, otherwise fall back to initial estimate
+        setActualResponseTimes(prev => {
+          let averageResponseTime;
+          
+          if (prev.length > 0) {
+            // Use average of actual response times
+            averageResponseTime = prev.reduce((sum, time) => sum + time, 0) / prev.length;
+          } else if (setupData?.estimatedTimePerPrompt) {
+            // Fall back to initial connection test time
+            averageResponseTime = setupData.estimatedTimePerPrompt;
+          } else {
+            return prev; // No time data available
+          }
+          
+          const newEstimatedTime = Math.max(1, Math.round(averageResponseTime * promptsRemaining));
+          setEstimatedTimeRemaining(newEstimatedTime);
+          
+          return prev; // Don't modify the array, just use it for calculation
+        });
+      }
+      
+      // Update status message with progress percentage
+      if (data.progress_percentage !== undefined) {
+        setStatusMessage(`Processing prompts: ${data.progress_percentage}% complete`);
+      }
     });
 
     ws.on('execution_update', (message: any) => {
@@ -264,33 +317,90 @@ const Dashboard: React.FC = () => {
 
     // Handle completed test results for live preview
     ws.on('test_completed', (message: any) => {
-      console.log('Test completed:', message);
       const data = message.data || message;
       
-      // Create a test result object for live preview
+      // Only create test result if we have at least the category
+      if (!data.category) {
+        console.warn('Incomplete test data received from backend - missing category:', data);
+        return;
+      }
+      
+      // Log if prompt is missing but continue processing
+      if (!data.prompt && !data.prompt_text) {
+        console.info('Test result received without prompt text, using fallback:', data);
+      }
+
+      // Handle undefined/null vulnerability_score
+      let vulnerability_score = data.vulnerability_score;
+      if (typeof vulnerability_score !== 'number' || isNaN(vulnerability_score)) {
+        vulnerability_score = 0;
+      }
+
+      // Generate a truly unique ID to avoid React key conflicts
+      const uniqueId = data.test_id || data.prompt_id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Create a test result object for live preview - using backend data with fallbacks
       const newTestResult: TestResult = {
-        id: Date.now(), // Temporary ID for live display
-        category: data.category || '',
-        prompt_text: data.prompt || '',
-        response_preview: data.response_preview || '',
-        vulnerability_score: data.vulnerability_score || 0,
+        id: uniqueId,
+        category: data.category,
+        prompt: data.prompt || data.prompt_text || data.currentPromptText || `${data.category} test prompt`, // Fallback prompt text
+        response_preview: data.response_preview || data.response_text || data.currentResponse || '',
+        vulnerability_score: vulnerability_score,
         risk_level: data.risk_level || 'low',
         safeguard_triggered: data.safeguard_triggered || false,
-        response_time: data.response_time || 0,
-        word_count: data.response_preview ? data.response_preview.split(' ').filter((w: string) => w.trim().length > 0).length : 0,
-        timestamp: new Date().toISOString()
+        response_time: parseFloat(data.response_time) || 0, // Ensure it's a number
+        word_count: data.word_count || (data.response_preview ? data.response_preview.split(' ').filter((w: string) => w.trim().length > 0).length : 0),
+        timestamp: data.timestamp || new Date().toISOString() // Prefer backend timestamp
       };
       
-      // Add to test results for live preview
-      setTestResults(prev => [...prev, newTestResult]);
+      // Collect actual response times for better time estimation
+      if (data.response_time !== undefined && data.response_time > 0) {
+        console.log(`✅ Response time received: ${data.response_time}s`);
+        
+        setActualResponseTimes(prev => {
+          const newTimes = [...prev, data.response_time];
+          
+          // Calculate average response time from actual tests
+          const averageResponseTime = newTimes.reduce((sum, time) => sum + time, 0) / newTimes.length;
+          
+          // Update estimated time remaining using actual average response time
+          if (totalPrompts > 0 && currentPrompt >= 0) {
+            const promptsRemaining = totalPrompts - currentPrompt;
+            const newEstimatedTime = Math.max(1, Math.round(averageResponseTime * promptsRemaining));
+            setEstimatedTimeRemaining(newEstimatedTime);
+            console.log(`🕒 Updated time estimate: ${newEstimatedTime}s (${promptsRemaining} prompts × ${averageResponseTime.toFixed(2)}s avg)`);
+          }
+          
+          return newTimes;
+        });
+      }
+      
+      // Add to test results for live preview (prevent duplicates)
+      setTestResults(prev => {
+        // Check if this test result already exists (by ID or by unique combination)
+        const existingResult = prev.find(existing => 
+          existing.id === uniqueId || 
+          (existing.category === newTestResult.category && 
+           existing.vulnerability_score === newTestResult.vulnerability_score &&
+           existing.timestamp === newTestResult.timestamp)
+        );
+        
+        if (existingResult) {
+          console.log('Duplicate test result detected, skipping:', uniqueId);
+          return prev; // Don't add duplicate
+        }
+        
+        return [...prev, newTestResult];
+      });
       
       // Update current execution state with completed test data
-      setCurrentPromptText(data.prompt || '');
-      setCurrentResponse(data.response_preview || '');
-      setSafeguardTriggered(data.safeguard_triggered || false);
-      setVulnerabilityScore(data.vulnerability_score || 0);
+      const promptText = data.prompt || data.prompt_text || data.currentPromptText;
+      const responseText = data.response_preview || data.response_text || data.currentResponse;
       
-      console.log('Added test result to live preview:', newTestResult);
+      if (promptText) setCurrentPromptText(promptText);
+      if (responseText) setCurrentResponse(responseText);
+      if (typeof data.safeguard_triggered === 'boolean') setSafeguardTriggered(data.safeguard_triggered);
+      if (typeof data.vulnerability_score === 'number') setVulnerabilityScore(data.vulnerability_score);
     });
 
     ws.on('error', (data: any) => {
@@ -334,11 +444,17 @@ const Dashboard: React.FC = () => {
       setEstimatedTimeRemaining(initialEstimatedTime);
     }
     
+    // Set assessment as running immediately when launching
+    setAssessmentStatus('running');
     setCurrentStep('execution');
     
-    // Send configuration to backend
+    // Send configuration to backend to start assessment
     if (socket && socket.connected) {
+      console.log('Launching assessment with data:', data);
       socket.emit('start_assessment', data);
+    } else {
+      console.error('WebSocket not connected - cannot start assessment');
+      setAssessmentStatus('idle');
     }
   };
 
@@ -669,6 +785,7 @@ const Dashboard: React.FC = () => {
           onStop={handleStopAssessment}
           estimatedTimeRemaining={estimatedTimeRemaining}
           statusMessage={statusMessage}
+          testResults={testResults}
         />
 
         {/* Live Results Preview */}
@@ -830,7 +947,7 @@ const Dashboard: React.FC = () => {
                   {dynamicFindings.strengths.length > 0 ? (
                     <ul className="space-y-2">
                       {dynamicFindings.strengths.map((strength, index) => (
-                        <li key={index} className="flex items-start">
+                        <li key={`strength-${index}-${strength.slice(0, 20)}`} className="flex items-start">
                           <span className="text-green-600 mr-2">•</span>
                           <span className="text-gray-700">{strength}</span>
                         </li>
@@ -842,44 +959,44 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Weaknesses */}
+              {/* Critical Weaknesses */}
               <div className="mb-6">
-                <h4 className="text-md font-semibold text-orange-700 mb-3 flex items-center">
-                  ⚠️ Weaknesses
+                <h4 className="text-md font-semibold text-red-700 mb-3 flex items-center">
+                  🚨 Critical Weaknesses
                 </h4>
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   {dynamicFindings.weaknesses.length > 0 ? (
                     <ul className="space-y-2">
                       {dynamicFindings.weaknesses.map((weakness, index) => (
-                        <li key={index} className="flex items-start">
-                          <span className="text-orange-600 mr-2">•</span>
+                        <li key={`weakness-${index}-${weakness.slice(0, 20)}`} className="flex items-start">
+                          <span className="text-red-600 mr-2">•</span>
                           <span className="text-gray-700">{weakness}</span>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-gray-600 italic">No specific weaknesses identified in this assessment.</p>
+                    <p className="text-gray-600 italic">No critical weaknesses identified in this assessment.</p>
                   )}
                 </div>
               </div>
 
-              {/* Potential Flaws */}
+              {/* Medium-Risk Potential Flaws */}
               <div className="mb-6">
-                <h4 className="text-md font-semibold text-red-700 mb-3 flex items-center">
-                  🚨 Potential Flaws
+                <h4 className="text-md font-semibold text-orange-700 mb-3 flex items-center">
+                  ⚠️ Medium-Risk Potential Flaws
                 </h4>
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                   {dynamicFindings.potential_flaws.length > 0 ? (
                     <ul className="space-y-2">
                       {dynamicFindings.potential_flaws.map((flaw, index) => (
-                        <li key={index} className="flex items-start">
-                          <span className="text-red-600 mr-2">•</span>
+                        <li key={`flaw-${index}-${flaw.slice(0, 20)}`} className="flex items-start">
+                          <span className="text-orange-600 mr-2">•</span>
                           <span className="text-gray-700">{flaw}</span>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-gray-600 italic">No critical flaws identified in this assessment.</p>
+                    <p className="text-gray-600 italic">No medium-risk potential flaws identified in this assessment.</p>
                   )}
                 </div>
               </div>
@@ -892,7 +1009,7 @@ const Dashboard: React.FC = () => {
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                   <ul className="space-y-2">
                     {priorityActions.map((action, index) => (
-                      <li key={index} className="flex items-start">
+                      <li key={`action-${index}-${action.slice(0, 20)}`} className="flex items-start">
                         <span className="text-purple-600 mr-2">•</span>
                         <span className="text-gray-700">{action}</span>
                       </li>

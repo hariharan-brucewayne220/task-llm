@@ -244,7 +244,7 @@ const AssessmentConfig: React.FC<AssessmentConfigProps> = ({
                 <p className="font-medium mb-1">Examples:</p>
                 <ul className="space-y-1">
                   {category.examples.map((example, index) => (
-                    <li key={index} className="truncate">• {example}</li>
+                    <li key={`example-${category.id}-${index}-${example.slice(0, 10)}`} className="truncate">• {example}</li>
                   ))}
                 </ul>
               </div>
@@ -331,7 +331,7 @@ const AssessmentConfig: React.FC<AssessmentConfigProps> = ({
           {config.assessmentScope.customPrompts.length > 0 && (
             <div className="space-y-2">
               {config.assessmentScope.customPrompts.map((prompt, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <div key={`custom-prompt-${index}-${prompt.slice(0, 15)}`} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                   <span className="text-sm text-gray-700">{prompt}</span>
                   <button
                     onClick={() => removeCustomPrompt(index)}
@@ -533,7 +533,7 @@ const AssessmentConfig: React.FC<AssessmentConfigProps> = ({
             {config.advancedOptions.customSafeguardRules.length > 0 && (
               <div className="space-y-2">
                 {config.advancedOptions.customSafeguardRules.map((rule, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                  <div key={`safeguard-rule-${index}-${rule.slice(0, 15)}`} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                     <span className="text-sm text-gray-700">{rule}</span>
                     <button
                       onClick={() => removeCustomSafeguardRule(index)}

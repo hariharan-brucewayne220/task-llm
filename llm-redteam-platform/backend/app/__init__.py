@@ -19,18 +19,49 @@ def create_app(config_name='default'):
     socketio.init_app(app, async_mode='threading')
     CORS(app, origins=app.config['CORS_ORIGINS'])
     
-    # Register blueprints
+    # Register blueprints with debug logging
+    print("Registering Flask blueprints...")
+    
     from app.api.assessments import bp as assessments_bp
     from app.api.results import bp as results_bp
     from app.api.export import bp as export_bp
     from app.api.connection_test import bp as connection_test_bp
     from app.api.model_comparisons import model_comparisons_bp
+    from app.api.scheduled_assessments import scheduled_assessments_bp
     
     app.register_blueprint(assessments_bp, url_prefix='/api')
+    print("   Registered assessments blueprint")
+    
     app.register_blueprint(results_bp, url_prefix='/api')
+    print("    Registered results blueprint")
+    
     app.register_blueprint(export_bp, url_prefix='/api')
+    print("    Registered export blueprint")
+    
     app.register_blueprint(connection_test_bp, url_prefix='/api')
-    app.register_blueprint(model_comparisons_bp)
+    print("    Registered connection_test blueprint")
+    
+    app.register_blueprint(model_comparisons_bp, url_prefix='/api')
+    print("    Registered model_comparisons blueprint")
+    
+    app.register_blueprint(scheduled_assessments_bp, url_prefix='/api')
+    print("    Registered scheduled_assessments blueprint")
+    
+    # Add a simple root route for testing
+    @app.route('/')
+    def index():
+        return jsonify({
+            'status': 'running',
+            'service': 'LLM Red Team Platform',
+            'version': '1.0.0',
+            'endpoints': [
+                '/api/assessments',
+                '/api/assessment-history', 
+                '/api/model-comparisons',
+                '/api/results',
+                '/api/export'
+            ]
+        })
     
     # Register WebSocket events
     from app.websocket import events

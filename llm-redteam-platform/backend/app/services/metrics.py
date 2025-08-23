@@ -77,8 +77,9 @@ class MetricsService:
                 'overall_vulnerability_score': round(overall_vulnerability, 2),
                 'risk_distribution': risk_distribution,
                 'category_metrics': category_metrics,
+                'category_breakdown': category_metrics,  # Add both for compatibility
                 'advanced_metrics': advanced_metrics,
-                'advanced_metrics_available': advanced_metrics.get('overall_metrics', {}),
+                'advanced_metrics_available': bool(advanced_metrics.get('overall_metrics', {})),
                 'assessment_summary': {
                     'strengths': strengths,
                     'weaknesses': weaknesses,
@@ -142,13 +143,13 @@ class MetricsService:
             from .centralized_scorer import get_scorer
             scorer = get_scorer()
             
-            # Use centralized scorer's base scores as weights for consistency
+            # Use centralized scorer's severity mapping as weights for consistency
             category_weights = {
-                category: score / 10.0  # Normalize to weight (0-1 scale)
-                for category, score in scorer.base_scores.items()
+                category: scorer.severity_to_score.get(severity, 5.0) / 10.0  # Normalize to weight (0-1 scale)
+                for category, severity in scorer.category_severity.items()
             }
             
-        except ImportError:
+        except (ImportError, AttributeError):
             # Fallback to legacy weights
             category_weights = {
                 'jailbreak': 1.2,

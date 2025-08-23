@@ -16,26 +16,6 @@
       "next_run": "2025-08-28T13:55:43.888364",
       "run_count": 4,
       "api_key_provider": "openai"
-    },
-    {
-      "id": "scheduled_1703548801_monthly",
-      "name": "Monthly Comprehensive Audit",
-      "provider": "anthropic",
-      "model": "claude-3-sonnet-20241022",
-      "categories": [
-        "jailbreak",
-        "bias",
-        "hallucination",
-        "privacy",
-        "manipulation"
-      ],
-      "schedule": "monthly",
-      "is_active": true,
-      "created_at": "2025-08-06T13:55:43.888364",
-      "last_run": null,
-      "next_run": "2025-09-05T13:55:43.888364",
-      "run_count": 0,
-      "api_key_provider": "anthropic"
     }
   ]
 }

@@ -1,13 +1,14 @@
 """API endpoints for model comparison data."""
 from flask import Blueprint, jsonify, request
 from app.models.model_comparison import ModelComparison
+from app.models.assessment_history import AssessmentHistory
 import logging
 
 logger = logging.getLogger(__name__)
 
 model_comparisons_bp = Blueprint('model_comparisons', __name__)
 
-@model_comparisons_bp.route('/api/model-comparisons', methods=['GET'])
+@model_comparisons_bp.route('/model-comparisons', methods=['GET'])
 def get_all_model_comparisons():
     """Get all model comparison records for chart visualization."""
     try:
@@ -33,7 +34,35 @@ def get_all_model_comparisons():
             'comparisons': []
         }), 500
 
-@model_comparisons_bp.route('/api/model-comparisons/<model_name>/<provider>', methods=['GET'])
+
+@model_comparisons_bp.route('/model-comparisons/assessment-history', methods=['GET'])
+def get_assessment_history():
+    """Get all assessment history records."""
+    try:
+        from app.models.assessment_history import AssessmentHistory
+        
+        # Get recent assessment history
+        history_records = AssessmentHistory.get_recent_history(limit=20)
+        
+        history_data = []
+        for record in history_records:
+            history_data.append(record.to_dict())
+        
+        return jsonify({
+            'success': True,
+            'history': history_data,
+            'count': len(history_data)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching assessment history: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'history': []
+        }), 500
+
+@model_comparisons_bp.route('/model-comparisons/<model_name>/<provider>', methods=['GET'])
 def get_model_history(model_name, provider):
     """Get historical data for a specific model."""
     try:
@@ -59,7 +88,7 @@ def get_model_history(model_name, provider):
             'history': []
         }), 500
 
-@model_comparisons_bp.route('/api/model-comparisons/chart-data', methods=['GET'])
+@model_comparisons_bp.route('/model-comparisons/chart-data', methods=['GET'])
 def get_chart_data():
     """Get formatted data specifically for chart visualization."""
     try:
@@ -131,4 +160,56 @@ def get_chart_data():
             'bar_chart': {'models': [], 'vulnerability_scores': [], 'safeguard_rates': [], 'response_times': []},
             'radial_chart': [],
             'risk_distribution': {'models': [], 'low': [], 'medium': [], 'high': [], 'critical': []}
+        }), 500
+
+@model_comparisons_bp.route('/assessment-history', methods=['GET'])
+def get_recent_assessment_history():
+    """Get recent assessment history (top 10 latest)."""
+    try:
+        limit = int(request.args.get('limit', 10))
+        history = AssessmentHistory.get_recent_history(limit=limit)
+        
+        history_data = []
+        for record in history:
+            history_data.append(record.to_dict())
+        
+        return jsonify({
+            'success': True,
+            'history': history_data,
+            'count': len(history_data)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching assessment history: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'history': []
+        }), 500
+
+@model_comparisons_bp.route('/assessment-history/<model_name>/<provider>', methods=['GET'])
+def get_model_assessment_history(model_name, provider):
+    """Get assessment history for a specific model."""
+    try:
+        limit = int(request.args.get('limit', 5))
+        history = AssessmentHistory.get_model_history(model_name, provider, limit=limit)
+        
+        history_data = []
+        for record in history:
+            history_data.append(record.to_dict())
+        
+        return jsonify({
+            'success': True,
+            'history': history_data,
+            'model_name': model_name,
+            'provider': provider,
+            'count': len(history_data)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching model history: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'history': []
         }), 500

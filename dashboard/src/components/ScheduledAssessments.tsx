@@ -25,23 +25,14 @@ interface ScheduledAssessmentsProps {
 
 const ScheduledAssessments: React.FC<ScheduledAssessmentsProps> = ({ onRunImmediate }) => {
   const [mounted, setMounted] = useState(false);
+  const [assessments, setAssessments] = useState<ScheduledAssessment[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
     setMounted(true);
+    loadScheduledAssessments();
   }, []);
-  const [assessments, setAssessments] = useState<ScheduledAssessment[]>([
-    {
-      id: '1',
-      name: 'Weekly Security Check',
-      provider: 'openai',
-      model: 'gpt-4',
-      categories: ['jailbreak', 'bias'],
-      schedule: 'Weekly',
-      nextRun: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      isActive: true,
-      lastRun: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    }
-  ]);
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newAssessment, setNewAssessment] = useState({
@@ -52,54 +43,157 @@ const ScheduledAssessments: React.FC<ScheduledAssessmentsProps> = ({ onRunImmedi
     schedule: 'weekly'
   });
 
-  const handleToggleActive = (id: string) => {
-    setAssessments(prev => prev.map(assessment => 
-      assessment.id === id 
-        ? { ...assessment, isActive: !assessment.isActive }
-        : assessment
-    ));
-  };
-
-  const handleDelete = (id: string) => {
-    setAssessments(prev => prev.filter(assessment => assessment.id !== id));
-  };
-
-  const handleCreate = () => {
-    const newId = (assessments.length + 1).toString();
-    const nextRun = new Date();
-    
-    // Calculate next run based on schedule
-    switch (newAssessment.schedule) {
-      case 'daily':
-        nextRun.setDate(nextRun.getDate() + 1);
-        break;
-      case 'weekly':
-        nextRun.setDate(nextRun.getDate() + 7);
-        break;
-      case 'monthly':
-        nextRun.setMonth(nextRun.getMonth() + 1);
-        break;
+  const loadScheduledAssessments = async () => {
+    try {
+      setLoading(true);
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/scheduled-assessments`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          // Convert API data to component format
+          const formattedAssessments = data.assessments.map((assessment: any) => ({
+            id: assessment.id,
+            name: assessment.name,
+            provider: assessment.provider,
+            model: assessment.model,
+            categories: assessment.categories,
+            schedule: assessment.schedule.charAt(0).toUpperCase() + assessment.schedule.slice(1),
+            nextRun: new Date(assessment.nextRun),
+            isActive: assessment.isActive,
+            lastRun: assessment.lastRun ? new Date(assessment.lastRun) : undefined
+          }));
+          setAssessments(formattedAssessments);
+          setError(null);
+        } else {
+          setError('Failed to load scheduled assessments');
+        }
+      } else {
+        setError('Failed to connect to backend');
+      }
+    } catch (error) {
+      console.error('Error loading scheduled assessments:', error);
+      setError('Error loading scheduled assessments');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setAssessments(prev => [...prev, {
-      id: newId,
-      name: newAssessment.name,
-      provider: newAssessment.provider,
-      model: newAssessment.model,
-      categories: newAssessment.categories,
-      schedule: newAssessment.schedule.charAt(0).toUpperCase() + newAssessment.schedule.slice(1),
-      nextRun,
-      isActive: true
-    }]);
+  const handleToggleActive = async (id: string) => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/scheduled-assessments/${id}/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          // Update local state with the updated assessment
+          setAssessments(prev => prev.map(assessment => 
+            assessment.id === id 
+              ? { 
+                  ...assessment, 
+                  isActive: data.assessment.isActive,
+                  nextRun: data.assessment.nextRun ? new Date(data.assessment.nextRun) : assessment.nextRun
+                }
+              : assessment
+          ));
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling assessment:', error);
+      setError('Failed to update assessment status');
+    }
+  };
 
-    setShowCreateForm(false);
-    setNewAssessment({
-      name: '',
-      provider: 'openai',
-      model: 'gpt-3.5-turbo',
-      categories: ['jailbreak'],
-      schedule: 'weekly'
-    });
+  const handleDelete = async (id: string) => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/scheduled-assessments/${id}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setAssessments(prev => prev.filter(assessment => assessment.id !== id));
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting assessment:', error);
+      setError('Failed to delete assessment');
+    }
+  };
+
+  const handleCreate = async () => {
+    try {
+      // Validate required fields before sending
+      if (!newAssessment.name.trim()) {
+        setError('Assessment name is required');
+        return;
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+      const requestBody = {
+        name: newAssessment.name,
+        provider: newAssessment.provider,
+        model: newAssessment.model,
+        categories: newAssessment.categories,
+        schedule: newAssessment.schedule
+      };
+
+      console.log('Creating scheduled assessment with data:', requestBody);
+
+      const response = await fetch(`${apiUrl}/api/scheduled-assessments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      if (response.ok) {
+        if (data.success && data.assessment) {
+          // Add the new assessment to local state
+          const formattedAssessment = {
+            id: data.assessment.id,
+            name: data.assessment.name,
+            provider: data.assessment.provider,
+            model: data.assessment.model,
+            categories: data.assessment.categories || [],
+            schedule: data.assessment.schedule.charAt(0).toUpperCase() + data.assessment.schedule.slice(1),
+            nextRun: new Date(data.assessment.nextRun),
+            isActive: data.assessment.isActive,
+            lastRun: data.assessment.lastRun ? new Date(data.assessment.lastRun) : undefined
+          };
+          
+          setAssessments(prev => [...prev, formattedAssessment]);
+          setShowCreateForm(false);
+          setNewAssessment({
+            name: '',
+            provider: 'openai',
+            model: 'gpt-3.5-turbo',
+            categories: ['jailbreak'],
+            schedule: 'weekly'
+          });
+          setError(null);
+        } else {
+          console.error('Invalid response structure:', data);
+          setError(data.error || 'Invalid response from server');
+        }
+      } else {
+        console.error('HTTP error:', response.status, data);
+        setError(data.error || `Server error: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Error creating assessment:', error);
+      setError(`Failed to create scheduled assessment: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   return (
@@ -116,6 +210,34 @@ const ScheduledAssessments: React.FC<ScheduledAssessmentsProps> = ({ onRunImmedi
           Schedule New
         </button>
       </div>
+
+      {/* Error message */}
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-sm text-red-600">{error}</p>
+            <button 
+              onClick={() => setError(null)} 
+              className="ml-auto text-red-400 hover:text-red-600"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Loading indicator */}
+      {loading && (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-2 text-gray-600">Loading scheduled assessments...</span>
+        </div>
+      )}
 
       {showCreateForm && (
         <div className="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">

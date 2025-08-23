@@ -26,6 +26,7 @@ interface ExecutionControlsProps {
   onStop: () => void;
   estimatedTimeRemaining: number; // in seconds
   statusMessage?: string;
+  testResults?: any[]; // Add test results for live stats
 }
 
 
@@ -44,7 +45,8 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
   onResume,
   onStop,
   estimatedTimeRemaining,
-  statusMessage
+  statusMessage,
+  testResults = []
 }) => {
   const [attackPatterns, setAttackPatterns] = useState<AttackPattern[]>([]);
   const [showLiveView, setShowLiveView] = useState(true);
@@ -66,20 +68,21 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
     }
   }, [isRunning, isPaused, localEstimatedTime]);
 
-  // Add current prompt to attack patterns when it changes
+  // Add current prompt to attack patterns when it changes - using testResults instead of local state
   useEffect(() => {
-    if (currentPromptText && currentResponse) {
-      const newPattern: AttackPattern = {
-        category: currentCategory,
-        prompt: currentPromptText,
-        response: currentResponse,
-        safeguardTriggered,
-        vulnerabilityScore,
-        timestamp: new Date().toISOString()
-      };
-      setAttackPatterns(prev => [...prev, newPattern]);
+    // Use testResults data instead of creating local patterns with hardcoded timestamps
+    if (testResults.length > 0) {
+      const patterns: AttackPattern[] = testResults.map(result => ({
+        category: result.category,
+        prompt: result.prompt,
+        response: result.response_preview,
+        safeguardTriggered: result.safeguard_triggered,
+        vulnerabilityScore: result.vulnerability_score,
+        timestamp: result.timestamp // Use backend timestamp
+      }));
+      setAttackPatterns(patterns);
     }
-  }, [currentPromptText, currentResponse, safeguardTriggered, vulnerabilityScore, currentCategory]);
+  }, [testResults]); // Depend on testResults instead of individual props
 
   const formatTime = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
@@ -243,7 +246,7 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="font-medium text-gray-900">Current Prompt</h4>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${getVulnerabilityColor(vulnerabilityScore)}`}>
-                    {getVulnerabilityLabel(vulnerabilityScore)} ({(vulnerabilityScore || 0).toFixed(2)}/10)
+                    {getVulnerabilityLabel(vulnerabilityScore)} ({vulnerabilityScore.toFixed(2)}/10)
                   </span>
                 </div>
                 <div className="bg-gray-50 p-3 rounded mb-3">
@@ -262,12 +265,12 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
               <h4 className="font-medium text-gray-900 mb-3">Recent Attack Patterns</h4>
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {attackPatterns.slice(-5).reverse().map((pattern, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-3">
+                  <div key={`pattern-${index}-${pattern.category}-${pattern.timestamp || index}`} className="border border-gray-200 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-700 capitalize">{pattern.category}</span>
                       <div className="flex items-center space-x-2">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getVulnerabilityColor(pattern.vulnerabilityScore)}`}>
-                          {(pattern.vulnerabilityScore || 0).toFixed(2)}/10
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getVulnerabilityColor(pattern.vulnerabilityScore ?? 0)}`}>
+                          {(pattern.vulnerabilityScore ?? 0).toFixed(2)}/10
                         </span>
                         {pattern.safeguardTriggered ? (
                           <CheckCircleIcon className="w-4 h-4 text-green-600" />
@@ -298,29 +301,58 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-white p-4 rounded-lg border border-gray-200 text-center">
           <div className="text-2xl font-bold text-blue-600">{currentPrompt}</div>
           <div className="text-sm text-gray-500">Current Prompt</div>
         </div>
         <div className="bg-white p-4 rounded-lg border border-gray-200 text-center">
           <div className="text-2xl font-bold text-green-600">
-            {attackPatterns.filter(p => p.safeguardTriggered).length}
+            {testResults.filter((r: any) => r.safeguard_triggered).length}
           </div>
           <div className="text-sm text-gray-500">Safeguards Triggered</div>
         </div>
         <div className="bg-white p-4 rounded-lg border border-gray-200 text-center">
           <div className="text-2xl font-bold text-orange-600">
-            {attackPatterns.length > 0 
-              ? (attackPatterns.reduce((sum, p) => sum + p.vulnerabilityScore, 0) / attackPatterns.length).toFixed(2)
-              : '0'
+            {testResults.length > 0 
+              ? (() => {
+                  const validScores = testResults
+                    .map((r: any) => r.vulnerability_score)
+                    .filter((score: number) => typeof score === 'number' && !isNaN(score));
+                  return validScores.length > 0 
+                    ? (validScores.reduce((sum: number, score: number) => sum + score, 0) / validScores.length).toFixed(2)
+                    : '—';
+                })()
+              : '—'
             }
           </div>
           <div className="text-sm text-gray-500">Avg Vulnerability</div>
         </div>
         <div className="bg-white p-4 rounded-lg border border-gray-200 text-center">
+          <div className="text-2xl font-bold text-indigo-600">
+            {testResults.length > 0 
+              ? (() => {
+                  const validTimes = testResults
+                    .map((r: any) => r.response_time)
+                    .filter((time: number) => typeof time === 'number' && !isNaN(time) && time >= 0);
+                  
+                  // Log if no response times found for debugging
+                  if (validTimes.length === 0 && testResults.length > 0) {
+                    console.log('ℹ️ No valid response times found in test results');
+                  }
+                  
+                  return validTimes.length > 0 
+                    ? (validTimes.reduce((sum: number, time: number) => sum + time, 0) / validTimes.length).toFixed(2)
+                    : '—';
+                })()
+              : '—'
+            }
+          </div>
+          <div className="text-sm text-gray-500">Avg Response Time (s)</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg border border-gray-200 text-center">
           <div className="text-2xl font-bold text-purple-600">
-            {new Set(attackPatterns.map(p => p.category)).size}
+            {new Set(testResults.map((r: any) => r.category)).size}
           </div>
           <div className="text-sm text-gray-500">Categories Tested</div>
         </div>
