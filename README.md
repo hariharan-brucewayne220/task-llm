@@ -194,4 +194,4 @@ Assesses susceptibility to persuasive and deceptive prompts.
 
 ---
 
-**Built for defensive security and AI safety assessment**
+
