@@ -85,20 +85,6 @@ This defensive security tool performs automated vulnerability assessments on LLM
    npm run dev
    ```
 
-4. **Environment Configuration**
-   ```bash
-   cp env.example .env
-   # Add your API keys to .env file
-   ```
-
-### Environment Variables
-```env
-OPENAI_API_KEY=your_openai_key
-ANTHROPIC_API_KEY=your_anthropic_key
-GOOGLE_API_KEY=your_google_key
-HUGGINGFACE_API_TOKEN=your_hf_token
-```
-
 ## Usage
 
 ### Web Dashboard
