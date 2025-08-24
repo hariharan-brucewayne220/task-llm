@@ -7,7 +7,8 @@ interface PDFExportProps {
   metrics: AssessmentMetrics | null;
   modelComparisons: ModelComparisonData[];
   testResults: any[];
-  assessmentStatus: any;
+  assessmentStatus: 'idle' | 'running' | 'paused' | 'completed';
+  assessmentId?: number;
   onExportStart: () => void;
   onExportComplete: () => void;
 }
@@ -17,6 +18,7 @@ const PDFExport: React.FC<PDFExportProps> = ({
   modelComparisons,
   testResults,
   assessmentStatus,
+  assessmentId,
   onExportStart,
   onExportComplete
 }) => {
@@ -90,7 +92,7 @@ const PDFExport: React.FC<PDFExportProps> = ({
           : metrics.total_tests || 0;
         
         const summary = [
-          `Assessment Status: ${assessmentStatus?.status || 'Unknown'}`,
+          `Assessment Status: ${assessmentStatus || 'Unknown'}`,
           `Total Tests: ${totalTests}`,
           `Safeguard Success Rate: ${metrics.safeguard_success_rate || 0}%`,
           `Overall Vulnerability Score: ${metrics.overall_vulnerability_score || 0}/10`,
@@ -413,17 +415,78 @@ const PDFExport: React.FC<PDFExportProps> = ({
     }
   };
 
+  const [isGeneratingComprehensive, setIsGeneratingComprehensive] = useState(false);
+  
+  const generateComprehensiveReport = async () => {
+    setIsGeneratingComprehensive(true);
+    
+    try {
+      // Get assessment ID from props or test results
+      const currentAssessmentId = assessmentId || 
+        (testResults.length > 0 ? testResults[0].assessment_id : null);
+      
+      if (!currentAssessmentId) {
+        alert('No assessment data available for comprehensive report');
+        return;
+      }
+      
+      // Check if report can be generated
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+      const checkResponse = await fetch(`${apiUrl}/api/reports/comprehensive/${currentAssessmentId}/check`);
+      const checkData = await checkResponse.json();
+      
+      if (!checkData.available) {
+        alert(`Cannot generate report: ${checkData.reason}`);
+        return;
+      }
+      
+      // Generate and download the report
+      const reportResponse = await fetch(`${apiUrl}/api/reports/comprehensive/${currentAssessmentId}`);
+      
+      if (reportResponse.ok) {
+        const blob = await reportResponse.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `comprehensive_assessment_report_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        const error = await reportResponse.json();
+        alert(`Failed to generate report: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Comprehensive report generation failed:', error);
+      alert('Failed to generate comprehensive report. Please try again.');
+    } finally {
+      setIsGeneratingComprehensive(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col items-center space-y-4">
+    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
       <button
         onClick={generatePDF}
-        className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full sm:w-auto px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
         disabled={(!metrics && modelComparisons.length === 0) || isGenerating}
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
         <span>{isGenerating ? 'Generating PDF...' : 'Export Full Report (PDF)'}</span>
+      </button>
+      
+      <button
+        onClick={generateComprehensiveReport}
+        className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={(!metrics && modelComparisons.length === 0) || isGeneratingComprehensive || assessmentStatus !== 'completed'}
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        <span>{isGeneratingComprehensive ? 'Generating Report...' : 'Comprehensive Report'}</span>
       </button>
     </div>
   );

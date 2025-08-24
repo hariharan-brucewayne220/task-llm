@@ -18,6 +18,8 @@ class AssessmentService:
     
     _running_assessments = {}  # Track running assessments: {id: {'running': bool, 'paused': bool}}
     _paused_assessments = {}   # Track paused assessments
+    _event_queues = {}         # Simple event queue for paused assessments: {id: [events...]}
+    _pause_timers = {}         # Track pause times for 1-hour cleanup
     
     @classmethod
     def run_assessment_async(cls, assessment_id: int, api_key: str = None):
@@ -39,21 +41,33 @@ class AssessmentService:
         
     @classmethod
     def pause_assessment(cls, assessment_id: int):
-        """Pause a running assessment."""
+        """Pause a running assessment and start event queuing."""
         if assessment_id in cls._running_assessments and cls._running_assessments[assessment_id].get('running', False):
             cls._running_assessments[assessment_id]['paused'] = True
             cls._paused_assessments[assessment_id] = True
-            logger.info(f"Pausing assessment {assessment_id}")
+            cls._event_queues[assessment_id] = []  # Initialize event queue
+            cls._pause_timers[assessment_id] = datetime.utcnow()  # Track pause time
+            logger.info(f"Pausing assessment {assessment_id} and starting event queue")
             return True
         return False
     
     @classmethod
     def resume_assessment(cls, assessment_id: int):
-        """Resume a paused assessment."""
+        """Resume a paused assessment and process queued events."""
         if assessment_id in cls._running_assessments and cls._running_assessments[assessment_id].get('paused', False):
+            # Process any queued events first
+            if assessment_id in cls._event_queues:
+                queued_events = cls._event_queues[assessment_id]
+                logger.info(f"Processing {len(queued_events)} queued events for assessment {assessment_id}")
+                for event in queued_events:
+                    send_assessment_update(assessment_id, event['type'], event['data'])
+                del cls._event_queues[assessment_id]
+            
             cls._running_assessments[assessment_id]['paused'] = False
             if assessment_id in cls._paused_assessments:
                 del cls._paused_assessments[assessment_id]
+            if assessment_id in cls._pause_timers:
+                del cls._pause_timers[assessment_id]
             logger.info(f"Resuming assessment {assessment_id}")
             return True
         else:
@@ -69,15 +83,36 @@ class AssessmentService:
     
     @classmethod
     def stop_assessment(cls, assessment_id: int):
-        """Stop a running assessment."""
+        """Stop a running assessment and clear event queue."""
         if assessment_id in cls._running_assessments:
             cls._running_assessments[assessment_id]['running'] = False
             cls._running_assessments[assessment_id]['paused'] = False
             if assessment_id in cls._paused_assessments:
                 del cls._paused_assessments[assessment_id]
-            logger.info(f"Stopping assessment {assessment_id}")
+            if assessment_id in cls._event_queues:
+                del cls._event_queues[assessment_id]  # Clear event queue
+            if assessment_id in cls._pause_timers:
+                del cls._pause_timers[assessment_id]  # Clear pause timer
+            logger.info(f"Stopping assessment {assessment_id} and clearing event queue")
             return True
         return False
+    
+    @classmethod
+    def _send_or_queue_event(cls, assessment_id: int, event_type: str, event_data: dict):
+        """Send event immediately or queue it if assessment is paused."""
+        if assessment_id in cls._paused_assessments:
+            # Queue the event for later
+            if assessment_id not in cls._event_queues:
+                cls._event_queues[assessment_id] = []
+            cls._event_queues[assessment_id].append({
+                'type': event_type,
+                'data': event_data,
+                'timestamp': datetime.utcnow().isoformat()
+            })
+            logger.info(f"Queued {event_type} event for paused assessment {assessment_id}")
+        else:
+            # Send immediately
+            send_assessment_update(assessment_id, event_type, event_data)
     
     @classmethod
     def get_assessment_state(cls, assessment_id: int):
@@ -114,6 +149,76 @@ class AssessmentService:
             'db_state': db_state,
             'assessment_exists': assessment is not None
         }
+    
+    @classmethod
+    def get_assessment_status(cls, assessment_id: int):
+        """Get detailed assessment status for debugging resume operations."""
+        try:
+            from app.models import Assessment
+            
+            # Check database status
+            assessment = Assessment.query.get(assessment_id)
+            database_status = assessment.status if assessment else 'not_found'
+            
+            # Check memory/queue status
+            memory_state = cls._running_assessments.get(assessment_id, {})
+            is_running = memory_state.get('running', False)
+            is_paused = memory_state.get('paused', False)
+            
+            # Check if in paused assessments dict
+            in_paused_dict = assessment_id in cls._paused_assessments
+            
+            # Check if has event queue
+            has_queue = assessment_id in cls._event_queues
+            queue_length = len(cls._event_queues.get(assessment_id, []))
+            
+            # Check pause timer
+            pause_time = cls._pause_timers.get(assessment_id)
+            
+            # Determine queue status
+            if has_queue:
+                queue_status = f'found_with_{queue_length}_events'
+            elif in_paused_dict:
+                queue_status = 'paused_but_no_queue'
+            else:
+                queue_status = 'not_found'
+            
+            return {
+                'database_status': database_status,
+                'memory_running': is_running,
+                'memory_paused': is_paused,
+                'in_paused_dict': in_paused_dict,
+                'queue_status': queue_status,
+                'queue_length': queue_length,
+                'pause_time': pause_time.isoformat() if pause_time else None,
+                'assessment_exists': assessment is not None
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting assessment status: {str(e)}")
+            return {
+                'database_status': 'error',
+                'queue_status': 'error',
+                'error': str(e)
+            }
+
+    @classmethod
+    def cleanup_old_paused_assessments(cls):
+        """Clean up assessments paused for more than 1 hour."""
+        from datetime import timedelta
+        
+        current_time = datetime.utcnow()
+        expired_assessments = []
+        
+        for assessment_id, pause_time in cls._pause_timers.items():
+            if current_time - pause_time > timedelta(hours=1):
+                expired_assessments.append(assessment_id)
+        
+        for assessment_id in expired_assessments:
+            logger.info(f"Cleaning up assessment {assessment_id} paused for over 1 hour")
+            cls.stop_assessment(assessment_id)
+        
+        return len(expired_assessments)
     
     @classmethod
     def _execute_assessment(cls, assessment_id: int, api_key: str = None, app=None):
@@ -187,9 +292,9 @@ class AssessmentService:
                         break
                         
                     try:
-                        # Send progress update
+                        # Send progress update (or queue if paused)
                         progress_percentage = ((i) / len(all_prompts)) * 100
-                        send_assessment_update(assessment_id, 'progress_update', {
+                        cls._send_or_queue_event(assessment_id, 'progress_update', {
                             'current_prompt': i + 1,
                             'total_prompts': len(all_prompts),
                             'progress_percentage': round(progress_percentage, 1),
@@ -198,8 +303,8 @@ class AssessmentService:
                             'status_message': f"Testing {prompt.category} prompt {i+1} of {len(all_prompts)}..."
                         })
                         
-                        # Send test started event
-                        send_assessment_update(assessment_id, 'test_started', {
+                        # Send test started event (or queue if paused)
+                        cls._send_or_queue_event(assessment_id, 'test_started', {
                             'prompt_id': prompt.id,
                             'category': prompt.category,
                             'progress': f"{i+1}/{len(all_prompts)}"
@@ -211,8 +316,8 @@ class AssessmentService:
                         # Save result to database
                         cls._save_test_result(assessment_id, prompt, result)
                         
-                        # Send test completed event with complete data
-                        send_assessment_update(assessment_id, 'test_completed', {
+                        # Send test completed event (or queue if paused)
+                        cls._send_or_queue_event(assessment_id, 'test_completed', {
                             'test_id': f"{assessment_id}_{prompt.id}_{i}",
                             'prompt_id': prompt.id,
                             'category': prompt.category,
@@ -228,15 +333,15 @@ class AssessmentService:
                         
                         completed_prompts += 1
                         
-                        # Send progress completion update
+                        # Send progress completion update (or queue if paused)
                         progress_percentage = ((i + 1) / len(all_prompts)) * 100
-                        send_assessment_update(assessment_id, 'progress_update', {
+                        cls._send_or_queue_event(assessment_id, 'progress_update', {
                             'current_prompt': i + 1,
                             'total_prompts': len(all_prompts),
                             'progress_percentage': round(progress_percentage, 1),
                             'current_category': prompt.category,
                             'current_prompt_preview': '',
-                            'status_message': f"✅ Completed {prompt.category} test {i+1} of {len(all_prompts)} - {result.get('risk_level', 'unknown')} risk detected"
+                            'status_message': f"Completed {prompt.category} test {i+1} of {len(all_prompts)} - {result.get('risk_level', 'unknown')} risk detected"
                         })
                         
                         # Small delay to avoid rate limiting

@@ -5,6 +5,8 @@ from app import socketio
 import logging
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
+
 # Store active connections
 active_connections = {}
 
@@ -33,9 +35,21 @@ def handle_disconnect():
     client_id = request.sid
     
     if client_id in active_connections:
+        # Get current assessment if any
+        current_assessment_id = active_connections[client_id].get('current_assessment_id')
+        
         # Leave all assessment rooms
         for assessment_id in active_connections[client_id]['subscribed_assessments']:
             leave_room(f'assessment_{assessment_id}')
+        
+        # Clean up assessments for disconnected client
+        if current_assessment_id:
+            try:
+                from app.services.assessment import AssessmentService
+                AssessmentService.stop_assessment(current_assessment_id)
+                logging.info(f"Stopped assessment {current_assessment_id} on client {client_id} disconnect")
+            except Exception as e:
+                logging.error(f"Error stopping assessment on disconnect: {str(e)}")
         
         del active_connections[client_id]
     
@@ -201,7 +215,7 @@ def handle_start_assessment(data=None):
         emit('test_event', {'message': 'Test event from start_assessment handler'})
         print(f"SENT test_event to client {client_id}")
         
-        # Start the real assessment using the assessment service with API key
+        # Start the assessment using the assessment service
         from app.services.assessment import AssessmentService
         AssessmentService.run_assessment_async(assessment.id, api_key=api_key)
         
@@ -281,9 +295,9 @@ def handle_resume_assessment(data=None):
                 assessment_id = recent_assessment.id
         
         if assessment_id:
-            # Debug the current state
-            debug_info = AssessmentService.debug_assessment_state(assessment_id)
-            print(f"DEBUG: Assessment {assessment_id} state: {debug_info}")
+            # Get detailed assessment status
+            status_info = AssessmentService.get_assessment_status(assessment_id)
+            print(f"DEBUG: Assessment {assessment_id} status: {status_info}")
             
             success = AssessmentService.resume_assessment(assessment_id)
             if success:
@@ -295,26 +309,18 @@ def handle_resume_assessment(data=None):
                 print(f"Assessment {assessment_id} resumed successfully")
             else:
                 # Check why resume failed with detailed info
-                print(f"Resume failed for assessment {assessment_id}: {debug_info}")
+                print(f"Resume failed for assessment {assessment_id}: {status_info}")
                 
-                if debug_info['db_state'] == 'completed':
+                if status_info and status_info['database_status'] == 'completed':
                     error_msg = "Assessment has already completed. Please start a new assessment."
-                elif debug_info['db_state'] == 'failed':
+                elif status_info and status_info['database_status'] == 'failed':
                     error_msg = "Assessment has failed. Please start a new assessment."
-                elif debug_info['db_state'] == 'stopped':
+                elif status_info and status_info['database_status'] == 'stopped':
                     error_msg = "Assessment was stopped. Please start a new assessment."
-                elif debug_info['memory_state'] == 'Not in memory':
-                    error_msg = "Assessment execution has ended. The pause/resume feature only works while the assessment is actively running."
-                    # Update DB status to reflect reality
-                    from app.models import Assessment
-                    from app import db
-                    assessment = Assessment.query.get(assessment_id)
-                    if assessment and assessment.status == 'running':
-                        assessment.status = 'completed'
-                        db.session.commit()
-                        print(f"Updated assessment {assessment_id} status from 'running' to 'completed'")
+                elif status_info and status_info['queue_status'] == 'not_found':
+                    error_msg = "Assessment queue not found. Please start a new assessment."
                 else:
-                    error_msg = f"Cannot resume: assessment not in paused state (current: {debug_info['memory_state']})"
+                    error_msg = f"Cannot resume assessment. Status: {status_info['queue_status'] if status_info else 'unknown'}"
                 
                 emit('error', {'message': error_msg})
                 print(f"Resume failed: {error_msg}")
@@ -333,8 +339,6 @@ def handle_stop_assessment(data=None):
     
     try:
         from app.services.assessment import AssessmentService
-        from app.models import Assessment
-        from app import db
         
         # Get assessment_id from data or use client's current assessment
         assessment_id = data.get('assessment_id') if data and isinstance(data, dict) else None
@@ -344,6 +348,7 @@ def handle_stop_assessment(data=None):
         
         if not assessment_id:
             # Find the most recent running assessment as fallback
+            from app.models import Assessment
             recent_assessment = Assessment.query.filter_by(status='running').order_by(Assessment.created_at.desc()).first()
             if recent_assessment:
                 assessment_id = recent_assessment.id
@@ -351,12 +356,6 @@ def handle_stop_assessment(data=None):
         if assessment_id:
             success = AssessmentService.stop_assessment(assessment_id)
             if success:
-                # Update assessment status in database
-                assessment = Assessment.query.get(assessment_id)
-                if assessment:
-                    assessment.status = 'stopped'
-                    db.session.commit()
-                
                 emit('assessment_stopped', {
                     'assessment_id': assessment_id,
                     'message': 'Assessment stopped successfully',

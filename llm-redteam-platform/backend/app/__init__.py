@@ -28,6 +28,7 @@ def create_app(config_name='default'):
     from app.api.connection_test import bp as connection_test_bp
     from app.api.model_comparisons import model_comparisons_bp
     from app.api.scheduled_assessments import scheduled_assessments_bp
+    from app.api.reports import bp as reports_bp
     
     app.register_blueprint(assessments_bp, url_prefix='/api')
     print("   Registered assessments blueprint")
@@ -46,6 +47,9 @@ def create_app(config_name='default'):
     
     app.register_blueprint(scheduled_assessments_bp, url_prefix='/api')
     print("    Registered scheduled_assessments blueprint")
+    
+    app.register_blueprint(reports_bp, url_prefix='/api')
+    print("    Registered reports blueprint")
     
     # Add a simple root route for testing
     @app.route('/')
