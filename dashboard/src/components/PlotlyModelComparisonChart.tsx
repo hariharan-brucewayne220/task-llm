@@ -125,7 +125,11 @@ const PlotlyModelComparisonChart: React.FC<PlotlyModelComparisonChartProps> = ({
           };
         });
         
-        setModelData(models);
+        // Filter out claude-3-sonnet as it's an outlier
+        const filteredModels = models.filter(model => 
+          !model.model_name.toLowerCase().includes('claude-3-sonnet')
+        );
+        setModelData(filteredModels);
       } else {
         setError(data.error || 'Failed to fetch model data');
       }
@@ -236,7 +240,7 @@ const PlotlyModelComparisonChart: React.FC<PlotlyModelComparisonChartProps> = ({
   ];
 
   // Prepare data for charts
-  const modelLabels = modelData.map(m => `${m.model_name} (${m.provider})`);
+  const modelLabels = modelData.map(m => m.model_name);
   const vulnerabilityScores = modelData.map(m => m.overall_vulnerability_score);
   const safeguardRates = modelData.map(m => m.safeguard_success_rate);
   const responseTimes = modelData.map(m => m.average_response_time);
@@ -282,13 +286,21 @@ const PlotlyModelComparisonChart: React.FC<PlotlyModelComparisonChartProps> = ({
     font: { family: 'Inter, sans-serif' },
     margin: { t: 50, b: 100, l: 60, r: 60 },
     xaxis: {
-      title: 'Models',
-      tickangle: -45
+      title: {
+        text: 'Models',
+        font: { size: 14, family: 'Inter, sans-serif' }
+      },
+      tickangle: -45,
+      tickfont: { size: 12 }
     },
     yaxis: {
-      title: `${selectedMetricConfig.label} (${selectedMetricConfig.unit})`,
+      title: {
+        text: `${selectedMetricConfig.label}${selectedMetricConfig.unit ? ` (${selectedMetricConfig.unit})` : ''}`,
+        font: { size: 14, family: 'Inter, sans-serif' }
+      },
       range: selectedMetric === 'vulnerability_score' ? [0, 10] : 
-             selectedMetric === 'safeguard_rate' ? [0, 100] : undefined
+             selectedMetric === 'safeguard_rate' ? [0, 100] : undefined,
+      tickfont: { size: 12 }
     },
     showlegend: false
   };
@@ -314,7 +326,7 @@ const PlotlyModelComparisonChart: React.FC<PlotlyModelComparisonChartProps> = ({
       r: values,
       theta: categories,
       fill: 'toself',
-      name: `${model.model_name} (${model.provider})`,
+      name: model.model_name,
       line: { color: colors[index % colors.length] },
       marker: { color: colors[index % colors.length], size: 8 },
       hovertemplate: '<b>%{fullData.name}</b><br>' +
@@ -391,21 +403,29 @@ const PlotlyModelComparisonChart: React.FC<PlotlyModelComparisonChartProps> = ({
       font: { size: 16, family: 'Inter, sans-serif' }
     },
     font: { family: 'Inter, sans-serif' },
-    margin: { t: 50, b: 100, l: 60, r: 60 },
+    margin: { t: 50, b: 100, l: 60, r: 120 },
     xaxis: {
-      title: 'Models',
-      tickangle: -45
+      title: {
+        text: 'Models',
+        font: { size: 14, family: 'Inter, sans-serif' }
+      },
+      tickangle: -45,
+      tickfont: { size: 12 }
     },
     yaxis: {
-      title: 'Number of Tests'
+      title: {
+        text: 'Number of Tests',
+        font: { size: 14, family: 'Inter, sans-serif' }
+      },
+      tickfont: { size: 12 }
     },
     barmode: 'stack',
     legend: {
-      orientation: 'h',
-      yanchor: 'bottom',
-      y: 1.02,
-      xanchor: 'center',
-      x: 0.5
+      orientation: 'v',
+      yanchor: 'middle',
+      y: 0.5,
+      xanchor: 'left',
+      x: 1.02
     }
   };
 
@@ -413,10 +433,8 @@ const PlotlyModelComparisonChart: React.FC<PlotlyModelComparisonChartProps> = ({
   const scatterData: PlotData[] = [{
     x: vulnerabilityScores,
     y: safeguardRates,
-    mode: 'markers+text',
+    mode: 'markers',
     type: 'scatter',
-    text: modelData.map(m => m.model_name),
-    textposition: 'top center',
     marker: {
       size: responseTimes.map(t => Math.max(8, Math.min(30, t * 3))), // Size based on response time
       color: responseTimes,
@@ -428,11 +446,12 @@ const PlotlyModelComparisonChart: React.FC<PlotlyModelComparisonChartProps> = ({
       },
       line: { width: 2, color: 'white' }
     },
-    hovertemplate: '<b>%{text}</b><br>' +
+    hovertemplate: '<b>%{customdata}</b><br>' +
                    'Vulnerability Score: %{x:.2f}<br>' +
                    'Safeguard Rate: %{y:.1f}%<br>' +
                    'Response Time: %{marker.color:.2f}s<br>' +
-                   '<extra></extra>'
+                   '<extra></extra>',
+    customdata: modelData.map(m => m.model_name)
   }];
 
   const scatterLayout: Partial<Layout> = {
@@ -443,12 +462,20 @@ const PlotlyModelComparisonChart: React.FC<PlotlyModelComparisonChartProps> = ({
     font: { family: 'Inter, sans-serif' },
     margin: { t: 50, b: 50, l: 60, r: 100 },
     xaxis: {
-      title: 'Vulnerability Score (0-10)',
-      range: [0, 10]
+      title: {
+        text: 'Vulnerability Score (0=Vulnerable, 10=Robust)',
+        font: { size: 14, family: 'Inter, sans-serif' }
+      },
+      range: [0, 10],
+      tickfont: { size: 12 }
     },
     yaxis: {
-      title: 'Safeguard Success Rate (%)',
-      range: [0, 100]
+      title: {
+        text: 'Safeguard Success Rate (%)',
+        font: { size: 14, family: 'Inter, sans-serif' }
+      },
+      range: [0, 100],
+      tickfont: { size: 12 }
     },
     showlegend: false
   };

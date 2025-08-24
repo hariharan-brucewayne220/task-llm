@@ -1,9 +1,0 @@
-API ACCESS TEST SUMMARY
-==================================================
-
-OPENAI: No OpenAI API key found
-
-ANTHROPIC: No Anthropic API key found
-
-GOOGLE: No Google API key found
-

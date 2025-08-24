@@ -197,15 +197,15 @@ const ScheduledAssessments: React.FC<ScheduledAssessmentsProps> = ({ onRunImmedi
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Scheduled Assessments</h3>
-          <p className="text-sm text-gray-600">Automated recurring security tests</p>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Scheduled Assessments</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Automated recurring security tests</p>
         </div>
         <button
           onClick={() => setShowCreateForm(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
         >
           Schedule New
         </button>
@@ -240,8 +240,8 @@ const ScheduledAssessments: React.FC<ScheduledAssessmentsProps> = ({ onRunImmedi
       )}
 
       {showCreateForm && (
-        <div className="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
-          <h4 className="text-md font-medium text-gray-900 mb-4">Create Scheduled Assessment</h4>
+        <div className="mb-6 p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
+          <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Create Scheduled Assessment</h4>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -382,7 +382,7 @@ const ScheduledAssessments: React.FC<ScheduledAssessmentsProps> = ({ onRunImmedi
                 </div>
                 
                 {assessment.lastRun && (
-                  <div className="mt-2 text-sm text-gray-500">
+                  <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                     Last run: {mounted ? assessment.lastRun.toLocaleString('en-US') : '...'}
                   </div>
                 )}
@@ -425,8 +425,8 @@ const ScheduledAssessments: React.FC<ScheduledAssessmentsProps> = ({ onRunImmedi
         ))}
         
         {assessments.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            <CalendarIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <CalendarIcon className="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
             <p>No scheduled assessments yet</p>
             <p className="text-sm">Create your first scheduled assessment to get started</p>
           </div>

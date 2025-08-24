@@ -123,8 +123,12 @@ def handle_get_assessment_status(data):
 def handle_start_assessment(data=None):
     """Handle starting a new assessment from frontend."""
     client_id = request.sid
-    print(f"START ASSESSMENT: Client {client_id} requested assessment start")
-    print(f"Data received: {data}")
+    print(f"START ASSESSMENT HANDLER CALLED: Client {client_id} requested assessment start")
+    print(f"START ASSESSMENT Data received: {data}")
+    
+    import traceback
+    print(f"START ASSESSMENT Call stack:")
+    traceback.print_stack()
     
     try:
         # Create a new assessment
@@ -182,6 +186,10 @@ def handle_start_assessment(data=None):
         room_name = f'assessment_{assessment.id}'
         join_room(room_name)
         
+        # Store the current assessment ID for pause/resume/stop functionality
+        if client_id in active_connections:
+            active_connections[client_id]['current_assessment_id'] = assessment.id
+        
         # Emit acknowledgment
         emit('assessment_started', {
             'assessment_id': assessment.id,
@@ -211,21 +219,111 @@ def handle_pause_assessment(data=None):
     client_id = request.sid
     print(f"PAUSE ASSESSMENT: Client {client_id} requested pause")
     
-    emit('assessment_paused', {
-        'message': 'Assessment paused',
-        'status': 'paused'
-    })
+    try:
+        from app.services.assessment import AssessmentService
+        
+        # Get assessment_id from data or use client's current assessment
+        assessment_id = data.get('assessment_id') if data and isinstance(data, dict) else None
+        
+        if not assessment_id and client_id in active_connections:
+            assessment_id = active_connections[client_id].get('current_assessment_id')
+        
+        if not assessment_id:
+            # Find the most recent running assessment as fallback
+            from app.models import Assessment
+            recent_assessment = Assessment.query.filter_by(status='running').order_by(Assessment.created_at.desc()).first()
+            if recent_assessment:
+                assessment_id = recent_assessment.id
+        
+        if assessment_id:
+            success = AssessmentService.pause_assessment(assessment_id)
+            if success:
+                emit('assessment_paused', {
+                    'assessment_id': assessment_id,
+                    'message': 'Assessment paused successfully',
+                    'status': 'paused'
+                })
+                print(f"Assessment {assessment_id} paused successfully")
+            else:
+                emit('error', {'message': 'Failed to pause assessment'})
+        else:
+            emit('error', {'message': 'No running assessment found to pause'})
+            
+    except Exception as e:
+        print(f"Error pausing assessment: {str(e)}")
+        emit('error', {'message': f'Failed to pause assessment: {str(e)}'})
 
 @socketio.on('resume_assessment')
 def handle_resume_assessment(data=None):
     """Handle resuming an assessment."""
     client_id = request.sid
-    print(f"RESUME ASSESSMENT: Client {client_id} requested resume")
+    print(f"RESUME ASSESSMENT HANDLER CALLED: Client {client_id} requested resume with data: {data}")
+    logger.info(f"Resume assessment handler called for client {client_id}")
     
-    emit('assessment_resumed', {
-        'message': 'Assessment resumed',
-        'status': 'running'
-    })
+    import traceback
+    print(f"RESUME ASSESSMENT Call stack:")
+    traceback.print_stack()
+    
+    try:
+        from app.services.assessment import AssessmentService
+        
+        # Get assessment_id from data or use client's current assessment
+        assessment_id = data.get('assessment_id') if data and isinstance(data, dict) else None
+        
+        if not assessment_id and client_id in active_connections:
+            assessment_id = active_connections[client_id].get('current_assessment_id')
+        
+        if not assessment_id:
+            # Find the most recent running assessment as fallback
+            from app.models import Assessment
+            recent_assessment = Assessment.query.filter_by(status='running').order_by(Assessment.created_at.desc()).first()
+            if recent_assessment:
+                assessment_id = recent_assessment.id
+        
+        if assessment_id:
+            # Debug the current state
+            debug_info = AssessmentService.debug_assessment_state(assessment_id)
+            print(f"DEBUG: Assessment {assessment_id} state: {debug_info}")
+            
+            success = AssessmentService.resume_assessment(assessment_id)
+            if success:
+                emit('assessment_resumed', {
+                    'assessment_id': assessment_id,
+                    'message': 'Assessment resumed successfully',
+                    'status': 'running'
+                })
+                print(f"Assessment {assessment_id} resumed successfully")
+            else:
+                # Check why resume failed with detailed info
+                print(f"Resume failed for assessment {assessment_id}: {debug_info}")
+                
+                if debug_info['db_state'] == 'completed':
+                    error_msg = "Assessment has already completed. Please start a new assessment."
+                elif debug_info['db_state'] == 'failed':
+                    error_msg = "Assessment has failed. Please start a new assessment."
+                elif debug_info['db_state'] == 'stopped':
+                    error_msg = "Assessment was stopped. Please start a new assessment."
+                elif debug_info['memory_state'] == 'Not in memory':
+                    error_msg = "Assessment execution has ended. The pause/resume feature only works while the assessment is actively running."
+                    # Update DB status to reflect reality
+                    from app.models import Assessment
+                    from app import db
+                    assessment = Assessment.query.get(assessment_id)
+                    if assessment and assessment.status == 'running':
+                        assessment.status = 'completed'
+                        db.session.commit()
+                        print(f"Updated assessment {assessment_id} status from 'running' to 'completed'")
+                else:
+                    error_msg = f"Cannot resume: assessment not in paused state (current: {debug_info['memory_state']})"
+                
+                emit('error', {'message': error_msg})
+                print(f"Resume failed: {error_msg}")
+        else:
+            emit('error', {'message': 'No paused assessment found to resume'})
+            
+    except Exception as e:
+        print(f"Error resuming assessment: {str(e)}")
+        emit('error', {'message': f'Failed to resume assessment: {str(e)}'})
 
 @socketio.on('stop_assessment')
 def handle_stop_assessment(data=None):
@@ -233,10 +331,46 @@ def handle_stop_assessment(data=None):
     client_id = request.sid
     print(f"STOP ASSESSMENT: Client {client_id} requested stop")
     
-    emit('assessment_stopped', {
-        'message': 'Assessment stopped',
-        'status': 'completed'
-    })
+    try:
+        from app.services.assessment import AssessmentService
+        from app.models import Assessment
+        from app import db
+        
+        # Get assessment_id from data or use client's current assessment
+        assessment_id = data.get('assessment_id') if data and isinstance(data, dict) else None
+        
+        if not assessment_id and client_id in active_connections:
+            assessment_id = active_connections[client_id].get('current_assessment_id')
+        
+        if not assessment_id:
+            # Find the most recent running assessment as fallback
+            recent_assessment = Assessment.query.filter_by(status='running').order_by(Assessment.created_at.desc()).first()
+            if recent_assessment:
+                assessment_id = recent_assessment.id
+        
+        if assessment_id:
+            success = AssessmentService.stop_assessment(assessment_id)
+            if success:
+                # Update assessment status in database
+                assessment = Assessment.query.get(assessment_id)
+                if assessment:
+                    assessment.status = 'stopped'
+                    db.session.commit()
+                
+                emit('assessment_stopped', {
+                    'assessment_id': assessment_id,
+                    'message': 'Assessment stopped successfully',
+                    'status': 'stopped'
+                })
+                print(f"Assessment {assessment_id} stopped successfully")
+            else:
+                emit('error', {'message': 'Failed to stop assessment'})
+        else:
+            emit('error', {'message': 'No running assessment found to stop'})
+            
+    except Exception as e:
+        print(f"Error stopping assessment: {str(e)}")
+        emit('error', {'message': f'Failed to stop assessment: {str(e)}'})
 
 # Server-side events for broadcasting updates
 def broadcast_assessment_started(assessment_id, assessment_data):

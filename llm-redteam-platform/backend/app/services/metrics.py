@@ -60,7 +60,13 @@ class MetricsService:
             safeguard_success_rate = (safeguard_successes / total_tests) * 100 if total_tests > 0 else 0
             
             # Calculate advanced metrics
-            advanced_metrics = cls._calculate_advanced_metrics(results)
+            logger.info("Starting advanced metrics calculation for %d results", len(results))
+            try:
+                advanced_metrics = cls._calculate_advanced_metrics(results)
+                logger.info("Advanced metrics calculation completed: %s", advanced_metrics)
+            except Exception as e:
+                logger.error("Advanced metrics calculation failed: %s", str(e))
+                advanced_metrics = {'overall_metrics': {}, 'error': str(e)}
             
             # Generate assessment summary
             strengths, weaknesses, potential_flaws = cls._generate_assessment_summary(
@@ -79,7 +85,11 @@ class MetricsService:
                 'category_metrics': category_metrics,
                 'category_breakdown': category_metrics,  # Add both for compatibility
                 'advanced_metrics': advanced_metrics,
-                'advanced_metrics_available': bool(advanced_metrics.get('overall_metrics', {})),
+                'advanced_metrics_available': not bool(advanced_metrics.get('error')),
+                # Expose individual metrics directly for UI
+                'bleu_score_factual': advanced_metrics.get('bleu_score_factual'),
+                'sentiment_bias_score': advanced_metrics.get('sentiment_bias_score'),
+                'consistency_score': advanced_metrics.get('consistency_score'),
                 'assessment_summary': {
                     'strengths': strengths,
                     'weaknesses': weaknesses,
@@ -420,7 +430,13 @@ class MetricsService:
             # Initialize advanced metrics service
             advanced_service = AdvancedMetricsService()
             
+            # Trigger lazy loading of sentence transformer before checking availability
+            _ = advanced_service.sentence_transformer
+            
             if not advanced_service.is_available():
+                logger.error("Advanced metrics service not available - sentiment_analyzer: %s, sentence_transformer: %s", 
+                           advanced_service.sentiment_analyzer is not None,
+                           advanced_service.sentence_transformer is not None)
                 return {
                     'overall_metrics': {},
                     'error': 'Advanced metrics service not available'
@@ -438,7 +454,10 @@ class MetricsService:
                 results_dict.append(result_dict)
             
             # Calculate comprehensive advanced metrics
+            logger.info("Advanced metrics service is available - calculating comprehensive metrics for %d results", len(results_dict))
             advanced_metrics = advanced_service.calculate_comprehensive_metrics(results_dict)
+            logger.info("Advanced metrics result: %s", advanced_metrics)
+            logger.info("Overall metrics: %s", advanced_metrics.get('overall_metrics', {}))
             
             # Extract overall metrics for easy access
             overall_metrics = advanced_metrics.get('overall_metrics', {})

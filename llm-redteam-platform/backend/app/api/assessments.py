@@ -100,13 +100,8 @@ def test_connection():
         provider = data.get('provider', 'openai')
         model = data.get('model', 'gpt-3.5-turbo')
         
-        # Get API key from environment
-        api_key_map = {
-            'openai': os.getenv('OPENAI_API_KEY'),
-            'anthropic': os.getenv('ANTHROPIC_API_KEY'),
-            'google': os.getenv('GOOGLE_API_KEY')
-        }
-        api_key = api_key_map.get(provider)
+        # Get API key from request (UI-provided only)
+        api_key = data.get('api_key') or data.get('apiKey')
         
         if not api_key:
             # Send failed connection test
@@ -180,16 +175,12 @@ def run_assessment(assessment_id):
                 'error': 'Assessment must be in pending status to run'
             }), 400
         
-        # Get API key
-        api_key_map = {
-            'openai': os.getenv('OPENAI_API_KEY'),
-            'anthropic': os.getenv('ANTHROPIC_API_KEY'),
-            'google': os.getenv('GOOGLE_API_KEY')
-        }
-        api_key = api_key_map.get(assessment.llm_provider)
+        # Get API key from request (UI-provided)
+        data = request.get_json() or {}
+        api_key = data.get('api_key') or data.get('apiKey')
         
         if not api_key:
-            return jsonify({'error': f'No API key found for provider: {assessment.llm_provider}'}), 400
+            return jsonify({'error': f'API key required for provider: {assessment.llm_provider}'}), 400
         
         # Delegate to AssessmentService for clean architecture
         AssessmentService.run_assessment_async(assessment_id, api_key)

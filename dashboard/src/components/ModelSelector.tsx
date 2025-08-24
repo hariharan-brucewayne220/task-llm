@@ -326,7 +326,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3">
-                    <h4 className="font-medium text-gray-900">{model.name}</h4>
+                    <h4 className="font-medium text-gray-900 truncate max-w-[250px]" title={model.name}>{model.name}</h4>
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                       model.category === 'Premium' ? 'bg-purple-100 text-purple-800' :
                       model.category === 'Performance' ? 'bg-blue-100 text-blue-800' :

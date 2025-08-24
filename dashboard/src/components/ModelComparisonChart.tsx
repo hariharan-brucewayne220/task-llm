@@ -153,7 +153,7 @@ const ModelComparisonChart: React.FC<ModelComparisonChartProps> = React.memo(({
 
   // Safeguard Success Rate Comparison
   const safeguardChart = {
-    labels: models.map(m => `${m.provider}/${m.model}`),
+    labels: models.map(m => m.model),
     datasets: [{
       label: 'Safeguard Success Rate (%)',
       data: models.map(m => m.safeguard_success_rate),
@@ -165,7 +165,7 @@ const ModelComparisonChart: React.FC<ModelComparisonChartProps> = React.memo(({
 
   // Vulnerability Score Comparison
   const vulnerabilityChart = {
-    labels: models.map(m => `${m.provider}/${m.model}`),
+    labels: models.map(m => m.model),
     datasets: [{
       label: 'Overall Vulnerability Score (0-10)',
       data: models.map(m => m.overall_vulnerability_score),
@@ -177,7 +177,7 @@ const ModelComparisonChart: React.FC<ModelComparisonChartProps> = React.memo(({
 
   // Response Time & Length Comparison (Multi-axis)
   const performanceChart = {
-    labels: models.map(m => `${m.provider}/${m.model}`),
+    labels: models.map(m => m.model),
     datasets: [
       {
         type: 'bar' as const,
@@ -203,7 +203,7 @@ const ModelComparisonChart: React.FC<ModelComparisonChartProps> = React.memo(({
 
   // Risk Distribution Stacked Bar Chart
   const riskDistributionChart = {
-    labels: models.map(m => `${m.provider}/${m.model}`),
+    labels: models.map(m => m.model),
     datasets: [
       {
         label: 'Low Risk',
@@ -241,7 +241,7 @@ const ModelComparisonChart: React.FC<ModelComparisonChartProps> = React.memo(({
   const radarChart = {
     labels: categories.map(cat => cat.charAt(0).toUpperCase() + cat.slice(1)),
     datasets: models.map((model, i) => ({
-      label: `${model.provider}/${model.model}`,
+      label: model.model,
       data: categories.map(cat => {
         const categoryData = model.category_breakdown[cat];
         return categoryData ? categoryData.safeguard_success_rate : 0;
@@ -257,7 +257,7 @@ const ModelComparisonChart: React.FC<ModelComparisonChartProps> = React.memo(({
   const advancedMetricsChart = {
     labels: ['BLEU Score', 'Sentiment Bias', 'Consistency'],
     datasets: models.filter(m => m.bleu_score_factual !== undefined || m.sentiment_bias_score !== undefined || m.consistency_score !== undefined).map((model, i) => ({
-      label: `${model.provider}/${model.model}`,
+      label: model.model,
       data: [
         model.bleu_score_factual || 0,
         model.sentiment_bias_score || 0,
@@ -342,7 +342,7 @@ const ModelComparisonChart: React.FC<ModelComparisonChartProps> = React.memo(({
         
         // Show detailed metric information
         alert(`Detailed Metric: ${label}\n` +
-              `Model: ${model.provider}/${model.model}\n` +
+              `Model: ${model.model}\n` +
               `Value: ${element.parsed.r.toFixed(2)}\n` +
               `Interpretation: ${getMetricInterpretation(label, element.parsed.r)}`);
       }

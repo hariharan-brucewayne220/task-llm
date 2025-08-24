@@ -111,14 +111,14 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
   return (
     <div className="space-y-6">
       {/* Main Execution Controls */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Assessment Execution</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Assessment Execution</h3>
           <div className="flex items-center space-x-2">
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-              isRunning ? 'bg-green-100 text-green-800' : 
-              isPaused ? 'bg-yellow-100 text-yellow-800' : 
-              'bg-gray-100 text-gray-800'
+              isRunning ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : 
+              isPaused ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' : 
+              'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
             }`}>
               {isRunning ? 'Running' : isPaused ? 'Paused' : 'Stopped'}
             </span>
@@ -129,7 +129,10 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
         <div className="flex items-center space-x-4 mb-6">
           {!isRunning ? (
             <button
-              onClick={onStart}
+              onClick={() => {
+                console.log('EXEC_CONTROLS: Start button clicked, isRunning:', isRunning, 'isPaused:', isPaused);
+                onStart();
+              }}
               className="flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
             >
               <PlayIcon className="w-5 h-5 mr-2" />
@@ -139,7 +142,10 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
             <>
               {isPaused ? (
                 <button
-                  onClick={onResume}
+                  onClick={() => {
+                    console.log('EXEC_CONTROLS: Resume button clicked, isRunning:', isRunning, 'isPaused:', isPaused);
+                    onResume();
+                  }}
                   className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
                   <PlayIcon className="w-5 h-5 mr-2" />
@@ -168,37 +174,28 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
         {/* Progress Bar */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
               Progress: {currentPrompt} of {totalPrompts} prompts
             </span>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
               {getProgressPercentage().toFixed(1)}% Complete
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
             <div
-              className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+              className="bg-blue-600 dark:bg-blue-500 h-3 rounded-full transition-all duration-300"
               style={{ width: `${getProgressPercentage()}%` }}
             />
           </div>
-          
-          {/* Status Message */}
-          {statusMessage && (
-            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-sm text-blue-800 font-medium">
-                {statusMessage}
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Time and Status */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="flex items-center space-x-2">
-            <ClockIcon className="w-5 h-5 text-gray-500" />
+            <ClockIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             <div>
-              <div className="text-sm text-gray-500">Estimated Time Remaining</div>
-              <div className={`font-medium ${localEstimatedTime <= 1 ? 'text-orange-600' : ''}`}>
+              <div className="text-sm text-gray-500 dark:text-gray-400">Estimated Time Remaining</div>
+              <div className={`font-medium text-gray-900 dark:text-white ${localEstimatedTime <= 1 ? 'text-orange-600 dark:text-orange-400' : ''}`}>
                 {formatTime(localEstimatedTime)}
               </div>
             </div>
@@ -206,8 +203,8 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
           <div className="flex items-center space-x-2">
             <div className="w-5 h-5 rounded-full bg-blue-500" />
             <div>
-              <div className="text-sm text-gray-500">Current Category</div>
-              <div className="font-medium capitalize">{currentCategory}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">Current Category</div>
+              <div className="font-medium text-gray-900 dark:text-white capitalize">{currentCategory}</div>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -217,8 +214,8 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
               <XCircleIcon className="w-5 h-5 text-red-600" />
             )}
             <div>
-              <div className="text-sm text-gray-500">Safeguard Status</div>
-              <div className={`font-medium ${safeguardTriggered ? 'text-green-600' : 'text-red-600'}`}>
+              <div className="text-sm text-gray-500 dark:text-gray-400">Safeguard Status</div>
+              <div className={`font-medium ${safeguardTriggered ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                 {safeguardTriggered ? 'Triggered' : 'Not Triggered'}
               </div>
             </div>
@@ -227,12 +224,12 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
       </div>
 
       {/* Live Attack Pattern Visualization */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Live Attack Pattern Monitoring</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Live Attack Pattern Monitoring</h3>
           <button
             onClick={() => setShowLiveView(!showLiveView)}
-            className="text-sm text-blue-600 hover:text-blue-800"
+            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
           >
             {showLiveView ? 'Hide' : 'Show'} Live View
           </button>
@@ -242,19 +239,19 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
           <div className="space-y-4">
             {/* Current Prompt Display */}
             {currentPromptText && (
-              <div className="border border-gray-200 rounded-lg p-4">
+              <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium text-gray-900">Current Prompt</h4>
+                  <h4 className="font-medium text-gray-900 dark:text-white">Current Prompt</h4>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${getVulnerabilityColor(vulnerabilityScore)}`}>
                     {getVulnerabilityLabel(vulnerabilityScore)} ({vulnerabilityScore.toFixed(2)}/10)
                   </span>
                 </div>
-                <div className="bg-gray-50 p-3 rounded mb-3">
-                  <p className="text-sm text-gray-700">{currentPromptText}</p>
+                <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded mb-3">
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{currentPromptText}</p>
                 </div>
                 {currentResponse && (
-                  <div className="bg-gray-50 p-3 rounded">
-                    <p className="text-sm text-gray-700">{currentResponse}</p>
+                  <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded">
+                    <p className="text-sm text-gray-700 dark:text-gray-300">{currentResponse}</p>
                   </div>
                 )}
               </div>
@@ -262,34 +259,34 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
 
             {/* Recent Attack Patterns */}
             <div>
-              <h4 className="font-medium text-gray-900 mb-3">Recent Attack Patterns</h4>
+              <h4 className="font-medium text-gray-900 dark:text-white mb-3">Recent Attack Patterns</h4>
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {attackPatterns.slice(-5).reverse().map((pattern, index) => (
-                  <div key={`pattern-${index}-${pattern.category}-${pattern.timestamp || index}`} className="border border-gray-200 rounded-lg p-3">
+                  <div key={`pattern-${index}-${pattern.category}-${pattern.timestamp || index}`} className="border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700 capitalize">{pattern.category}</span>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">{pattern.category}</span>
                       <div className="flex items-center space-x-2">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getVulnerabilityColor(pattern.vulnerabilityScore ?? 0)}`}>
                           {(pattern.vulnerabilityScore ?? 0).toFixed(2)}/10
                         </span>
                         {pattern.safeguardTriggered ? (
-                          <CheckCircleIcon className="w-4 h-4 text-green-600" />
+                          <CheckCircleIcon className="w-4 h-4 text-green-600 dark:text-green-400" />
                         ) : (
-                          <XCircleIcon className="w-4 h-4 text-red-600" />
+                          <XCircleIcon className="w-4 h-4 text-red-600 dark:text-red-400" />
                         )}
                       </div>
                     </div>
-                    <div className="text-xs text-gray-500 mb-2">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                       {new Date(pattern.timestamp).toLocaleTimeString()}
                     </div>
                     <div className="space-y-2">
-                      <div className="bg-gray-50 p-2 rounded">
-                        <p className="text-xs text-gray-700 font-medium">Prompt:</p>
-                        <p className="text-xs text-gray-600 truncate">{pattern.prompt}</p>
+                      <div className="bg-gray-50 dark:bg-gray-600 p-2 rounded">
+                        <p className="text-xs text-gray-700 dark:text-gray-300 font-medium">Prompt:</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{pattern.prompt}</p>
                       </div>
-                      <div className="bg-gray-50 p-2 rounded">
-                        <p className="text-xs text-gray-700 font-medium">Response:</p>
-                        <p className="text-xs text-gray-600 truncate">{pattern.response}</p>
+                      <div className="bg-gray-50 dark:bg-gray-600 p-2 rounded">
+                        <p className="text-xs text-gray-700 dark:text-gray-300 font-medium">Response:</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{pattern.response}</p>
                       </div>
                     </div>
                   </div>
@@ -302,18 +299,18 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-gray-200 text-center">
-          <div className="text-2xl font-bold text-blue-600">{currentPrompt}</div>
-          <div className="text-sm text-gray-500">Current Prompt</div>
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-center">
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{currentPrompt}</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Current Prompt</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200 text-center">
-          <div className="text-2xl font-bold text-green-600">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-center">
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
             {testResults.filter((r: any) => r.safeguard_triggered).length}
           </div>
-          <div className="text-sm text-gray-500">Safeguards Triggered</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Safeguards Triggered</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200 text-center">
-          <div className="text-2xl font-bold text-orange-600">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-center">
+          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
             {testResults.length > 0 
               ? (() => {
                   const validScores = testResults
@@ -326,10 +323,10 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
               : '—'
             }
           </div>
-          <div className="text-sm text-gray-500">Avg Vulnerability</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Avg Vulnerability</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200 text-center">
-          <div className="text-2xl font-bold text-indigo-600">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-center">
+          <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
             {testResults.length > 0 
               ? (() => {
                   const validTimes = testResults
@@ -348,13 +345,13 @@ const ExecutionControls: React.FC<ExecutionControlsProps> = ({
               : '—'
             }
           </div>
-          <div className="text-sm text-gray-500">Avg Response Time (s)</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Avg Response Time (s)</div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200 text-center">
-          <div className="text-2xl font-bold text-purple-600">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-center">
+          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
             {new Set(testResults.map((r: any) => r.category)).size}
           </div>
-          <div className="text-sm text-gray-500">Categories Tested</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Categories Tested</div>
         </div>
       </div>
     </div>

@@ -9,7 +9,9 @@ import {
   CogIcon,
   ChartBarIcon,
   DocumentTextIcon,
-  ShieldExclamationIcon
+  ShieldExclamationIcon,
+  SunIcon,
+  MoonIcon
 } from '@heroicons/react/24/outline';
 import PlotlyMetricsChart from './PlotlyMetricsChart';
 import PlotlyModelComparisonChart from './PlotlyModelComparisonChart';
@@ -45,6 +47,9 @@ const Dashboard: React.FC = () => {
   // WebSocket connection
   const [socket, setSocket] = useState<Socket | null>(null);
   const [recentAssessments, setRecentAssessments] = useState<any[]>([]);
+  
+  // Theme state
+  const [isDarkTheme, setIsDarkTheme] = useState(false);
 
   // Fetch recent assessments from database
   const fetchRecentAssessments = async () => {
@@ -123,6 +128,30 @@ const Dashboard: React.FC = () => {
       console.error('Failed to fetch assessment results:', error);
     }
   };
+  
+  // Theme toggle handler
+  const toggleTheme = () => {
+    setIsDarkTheme(!isDarkTheme);
+  };
+  
+  // Apply theme to document
+  useEffect(() => {
+    if (isDarkTheme) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkTheme]);
+  
+  // Load saved theme preference
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      setIsDarkTheme(true);
+    }
+  }, []);
 
   useEffect(() => {
     // Initialize WebSocket connection  
@@ -403,8 +432,48 @@ const Dashboard: React.FC = () => {
       if (typeof data.vulnerability_score === 'number') setVulnerabilityScore(data.vulnerability_score);
     });
 
+    // Handle assessment paused event
+    ws.on('assessment_paused', (data: any) => {
+      console.log('Assessment paused:', data);
+      setAssessmentStatus('paused');
+      setStatusMessage(data.message || 'Assessment paused');
+    });
+
+    // Handle assessment resumed event
+    ws.on('assessment_resumed', (data: any) => {
+      console.log('Assessment resumed:', data);
+      setAssessmentStatus('running');
+      setStatusMessage(data.message || 'Assessment resumed');
+    });
+
+    // Handle assessment stopped event
+    ws.on('assessment_stopped', (data: any) => {
+      console.log('Assessment stopped:', data);
+      setAssessmentStatus('completed');
+      setCurrentStep('results');
+      setStatusMessage(data.message || 'Assessment stopped');
+    });
+
     ws.on('error', (data: any) => {
       console.error('WebSocket error:', data);
+      
+      // Handle resume-specific errors by resetting state
+      if (data.message && data.message.includes('Assessment execution has ended') || 
+          data.message.includes('already completed') || 
+          data.message.includes('has failed') ||
+          data.message.includes('was stopped')) {
+        
+        console.log('Assessment can no longer be resumed, resetting to idle state');
+        setAssessmentStatus('idle');
+        setCurrentStep('overview');
+        setStatusMessage('Assessment ended. Please start a new assessment.');
+        
+        // Clear assessment data
+        setCurrentPrompt(0);
+        setCurrentPromptText('');
+        setCurrentResponse('');
+        setEstimatedTimeRemaining(0);
+      }
     });
 
     ws.on('disconnect', () => {
@@ -459,10 +528,14 @@ const Dashboard: React.FC = () => {
   };
 
   const handleStartAssessment = () => {
+    console.log('FRONTEND: handleStartAssessment called - THIS SHOULD NOT HAPPEN ON RESUME!');
+    console.log('FRONTEND: Current assessment status:', assessmentStatus);
+    
     setAssessmentStatus('running');
     setCurrentPrompt(0);
     
     if (socket && socket.connected) {
+      console.log('FRONTEND: Emitting start_assessment event');
       socket.emit('start_assessment');
     }
   };
@@ -476,17 +549,20 @@ const Dashboard: React.FC = () => {
   };
 
   const handleResumeAssessment = () => {
-    setAssessmentStatus('running');
+    // Don't optimistically set state - let WebSocket event handle it
+    console.log('FRONTEND: handleResumeAssessment called');
+    console.log('FRONTEND: Current assessment status:', assessmentStatus);
+    console.log('FRONTEND: Socket connected:', socket?.connected);
     
     if (socket && socket.connected) {
+      console.log('FRONTEND: About to emit resume_assessment event');
       socket.emit('resume_assessment');
+      console.log('FRONTEND: resume_assessment event emitted');
     }
   };
 
   const handleStopAssessment = () => {
-    setAssessmentStatus('completed');
-    setCurrentStep('results');
-    
+    // Only send the stop request - let WebSocket event handle state changes
     if (socket && socket.connected) {
       socket.emit('stop_assessment');
     }
@@ -560,20 +636,33 @@ const Dashboard: React.FC = () => {
   };
 
   const renderOverviewView = () => (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 transition-colors">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                 🛡️ LLM Red Team Dashboard
           </h1>
-              <p className="text-gray-600 mt-2">
+              <p className="text-gray-600 dark:text-gray-400 mt-2">
                 Comprehensive security assessment and monitoring for Large Language Models
               </p>
             </div>
             <div className="flex items-center space-x-4">
+              {/* Theme Toggle */}
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Toggle theme"
+              >
+                {isDarkTheme ? (
+                  <SunIcon className="h-6 w-6 text-yellow-500" />
+                ) : (
+                  <MoonIcon className="h-6 w-6 text-gray-700" />
+                )}
+              </button>
+              
               <button
                 onClick={handleNewAssessment}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
@@ -602,19 +691,19 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* Recent Results Summary */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Assessment Results</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Assessment Results</h3>
             
             {recentAssessments.length > 0 ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="text-sm font-medium text-gray-700">Total Assessments</div>
-                    <div className="text-2xl font-bold text-gray-900">{recentAssessments.length}</div>
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Assessments</div>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{recentAssessments.length}</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="text-sm font-medium text-gray-700">Completed</div>
-                    <div className="text-2xl font-bold text-green-600">
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Completed</div>
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                       {recentAssessments.filter(a => a.status === 'completed').length}
                     </div>
                   </div>
@@ -624,15 +713,15 @@ const Dashboard: React.FC = () => {
                   <h4 className="text-sm font-medium text-gray-700 mb-2">Recent Assessments</h4>
                   <div className="space-y-2">
                     {recentAssessments.slice(0, 5).map((assessment, index) => (
-                      <div key={assessment.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded">
+                      <div key={assessment.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded">
                         <div className="flex items-center">
                           <span className={`w-2 h-2 rounded-full mr-3 ${
                             assessment.status === 'completed' ? 'bg-green-500' : 
                             assessment.status === 'running' ? 'bg-blue-500' : 'bg-gray-400'
                           }`}></span>
                           <div>
-                            <span className="text-sm font-medium text-gray-700">{assessment.name}</span>
-                            <div className="text-xs text-gray-500">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{assessment.name}</span>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
                               {assessment.llm_provider} • {assessment.model_name}
                             </div>
                           </div>
@@ -645,7 +734,7 @@ const Dashboard: React.FC = () => {
                             {assessment.status}
                           </span>
                           {assessment.overall_score && (
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
                               Score: {assessment.overall_score.toFixed(1)}/10
                             </div>
                           )}
@@ -663,8 +752,8 @@ const Dashboard: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                <ChartBarIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <ChartBarIcon className="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                 <p>No assessments found</p>
                 <p className="text-sm">Start your first red team assessment to see results</p>
                 <button
@@ -679,40 +768,40 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="mt-8 bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+        <div className="mt-8 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <button
               onClick={handleNewAssessment}
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
+              className="flex items-center p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-blue-300 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
             >
               <PlayIcon className="h-6 w-6 text-blue-600 mr-3" />
               <div className="text-left">
-                <div className="font-medium">Quick Assessment</div>
-                <div className="text-sm text-gray-600">Run immediate security test</div>
+                <div className="font-medium text-gray-900 dark:text-white">Quick Assessment</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Run immediate security test</div>
               </div>
             </button>
             
             <button
               onClick={() => setCurrentStep('setup')}
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors"
+              className="flex items-center p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-green-300 dark:hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
             >
               <CogIcon className="h-6 w-6 text-green-600 mr-3" />
               <div className="text-left">
-                <div className="font-medium">Custom Setup</div>
-                <div className="text-sm text-gray-600">Configure detailed parameters</div>
+                <div className="font-medium text-gray-900 dark:text-white">Custom Setup</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Configure detailed parameters</div>
               </div>
             </button>
             
             {testResults.length > 0 && (
               <button
                 onClick={() => setCurrentStep('results')}
-                className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-colors"
+                className="flex items-center p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-purple-300 dark:hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
               >
                 <DocumentTextIcon className="h-6 w-6 text-purple-600 mr-3" />
                 <div className="text-left">
-                  <div className="font-medium">View Reports</div>
-                  <div className="text-sm text-gray-600">Analyze recent results</div>
+                  <div className="font-medium text-gray-900 dark:text-white">View Reports</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Analyze recent results</div>
                 </div>
               </button>
             )}
@@ -723,44 +812,44 @@ const Dashboard: React.FC = () => {
   );
 
   const renderSetupView = () => (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
       <SetupWizard
         onSetupComplete={handleSetupComplete}
-        onCancel={() => setCurrentStep('setup')}
+        onCancel={() => setCurrentStep('overview')}
       />
     </div>
   );
 
   const renderExecutionView = () => (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 transition-colors">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                 🛡️ Red Team Assessment in Progress
               </h1>
-              <p className="text-gray-600 mt-2">
+              <p className="text-gray-600 dark:text-gray-400 mt-2">
                 Testing {setupData?.selectedModel} for vulnerabilities
               </p>
             </div>
             <div className="flex items-center space-x-4">
               <button
                 onClick={handleBackToOverview}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
               >
                 ← Dashboard
               </button>
               <button
                 onClick={handleBackToSetup}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
               >
                 ← Back to Setup
               </button>
               <button
                 onClick={handleNewAssessment}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                className="px-4 py-2 bg-gray-600 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
               >
                 New Assessment
               </button>
@@ -768,78 +857,168 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Execution Controls */}
-        <ExecutionControls
-          isRunning={assessmentStatus === 'running'}
-          isPaused={assessmentStatus === 'paused'}
-          currentPrompt={currentPrompt}
-          totalPrompts={totalPrompts}
-          currentCategory={currentCategory}
-          currentPromptText={currentPromptText}
-          currentResponse={currentResponse}
-          safeguardTriggered={safeguardTriggered}
-          vulnerabilityScore={vulnerabilityScore}
-          onStart={handleStartAssessment}
-          onPause={handlePauseAssessment}
-          onResume={handleResumeAssessment}
-          onStop={handleStopAssessment}
-          estimatedTimeRemaining={estimatedTimeRemaining}
-          statusMessage={statusMessage}
-          testResults={testResults}
-        />
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          {/* Left Column - Execution Controls */}
+          <div className="xl:col-span-2">
+            <ExecutionControls
+              isRunning={assessmentStatus === 'running'}
+              isPaused={assessmentStatus === 'paused'}
+              currentPrompt={currentPrompt}
+              totalPrompts={totalPrompts}
+              currentCategory={currentCategory}
+              currentPromptText={currentPromptText}
+              currentResponse={currentResponse}
+              safeguardTriggered={safeguardTriggered}
+              vulnerabilityScore={vulnerabilityScore}
+              onStart={handleStartAssessment}
+              onPause={handlePauseAssessment}
+              onResume={handleResumeAssessment}
+              onStop={handleStopAssessment}
+              estimatedTimeRemaining={estimatedTimeRemaining}
+              statusMessage={statusMessage}
+              testResults={testResults}
+            />
+          </div>
+
+          {/* Right Column - Assessment Status & Quick Actions */}
+          <div className="space-y-6">
+            {/* Current Assessment Info */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Assessment Info</h3>
+              <div className="space-y-3">
+                <div>
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Model</div>
+                  <div className="text-gray-900 dark:text-white">{setupData?.selectedModel || 'N/A'}</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Provider</div>
+                  <div className="text-gray-900 dark:text-white capitalize">{setupData?.selectedProvider || 'N/A'}</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Test Categories</div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {setupData?.assessmentConfig?.testCategories?.map((category: string) => (
+                      <span key={category} className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs rounded-full capitalize">
+                        {category}
+                      </span>
+                    )) || <span className="text-gray-500 dark:text-gray-400">N/A</span>}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</div>
+                  <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                    assessmentStatus === 'running' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :
+                    assessmentStatus === 'paused' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' :
+                    assessmentStatus === 'completed' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' :
+                    'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                  }`}>
+                    {assessmentStatus.charAt(0).toUpperCase() + assessmentStatus.slice(1)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
+              <div className="space-y-3">
+                <button
+                  onClick={handleBackToOverview}
+                  className="w-full px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
+                >
+                  ← Back to Dashboard
+                </button>
+                <button
+                  onClick={handleBackToSetup}
+                  className="w-full px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
+                >
+                  ← Back to Setup
+                </button>
+                {testResults.length > 0 && (
+                  <button
+                    onClick={() => setCurrentStep('results')}
+                    className="w-full px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors"
+                  >
+                    View Results →
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Recent Test Summary */}
+            {testResults.length > 0 && (
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Test Summary</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{testResults.length}</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Tests Run</div>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {testResults.filter(r => r.safeguard_triggered).length}
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Safeguards</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Live Results Preview */}
         {testResults.length > 0 && (
-          <div className="mt-8 bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="mt-8 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Live Results Preview
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {testResults.slice(-6).map((result) => (
-                <div key={result.id} className="border border-gray-200 rounded-lg p-4">
+                <div key={result.id} className="border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700 capitalize">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
                       {result.category}
                     </span>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      (result.vulnerability_score || 0) >= 7.5 ? 'bg-green-100 text-green-800' :
-                      (result.vulnerability_score || 0) >= 5 ? 'bg-yellow-100 text-yellow-800' :
-                      (result.vulnerability_score || 0) >= 2.5 ? 'bg-orange-100 text-orange-800' :
-                      'bg-red-100 text-red-800'
+                      (result.vulnerability_score || 0) >= 7.5 ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :
+                      (result.vulnerability_score || 0) >= 5 ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' :
+                      (result.vulnerability_score || 0) >= 2.5 ? 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200' :
+                      'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
                     }`}>
                       {(result.vulnerability_score || 0).toFixed(2)}/10
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 mb-2">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                     {new Date(result.timestamp).toLocaleTimeString()}
                   </div>
                   <div className="space-y-2">
-                    <div className="bg-gray-50 p-2 rounded">
-                      <p className="text-xs text-gray-700 font-medium">Prompt:</p>
-                      <p className="text-xs text-gray-600 truncate">{result.prompt}</p>
+                    <div className="bg-gray-50 dark:bg-gray-600 p-2 rounded">
+                      <p className="text-xs text-gray-700 dark:text-gray-300 font-medium">Prompt:</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{result.prompt}</p>
                     </div>
-                    <div className="bg-gray-50 p-2 rounded">
-                      <p className="text-xs text-gray-700 font-medium">Response:</p>
-                      <p className="text-xs text-gray-600 truncate">{result.response_preview}</p>
+                    <div className="bg-gray-50 dark:bg-gray-600 p-2 rounded">
+                      <p className="text-xs text-gray-700 dark:text-gray-300 font-medium">Response:</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{result.response_preview}</p>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-              </div>
-            )}
+          </div>
+        )}
       </div>
     </div>
   );
 
   const renderResultsView = () => (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 transition-colors">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
             <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                 🎯 Assessment Complete
               </h1>
               <p className="text-gray-600 mt-2">
@@ -1040,7 +1219,7 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
       {renderContent()}
     </div>
   );

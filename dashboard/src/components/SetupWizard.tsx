@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ChevronRightIcon, 
   ChevronLeftIcon,
@@ -26,6 +26,16 @@ export interface SetupData {
 
 const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) => {
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // Initialize theme from localStorage on component mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [connectionError, setConnectionError] = useState('');
   const [connectionMessage, setConnectionMessage] = useState('');
@@ -238,10 +248,10 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                 Step 1: Select LLM Provider
               </h2>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 Choose your target LLM provider for red team testing
               </p>
             </div>
@@ -253,24 +263,24 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
                   onClick={() => handleProviderSelect(key)}
                   className={`p-6 border-2 rounded-lg transition-all hover:shadow-lg ${
                     setupData.selectedProvider === key
-                      ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-200 dark:ring-blue-700'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800'
                   }`}
                 >
                   <div className="text-center">
                     <div className="text-2xl mb-3">
                       {key === 'openai' ? '🤖' : key === 'anthropic' ? '🧠' : '🔍'}
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                       {provider.name}
                     </h3>
-                    <p className="text-sm text-gray-600 mb-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                       {provider.description}
                     </p>
                     {setupData.selectedProvider === key && (
                       <div className="flex items-center justify-center mt-3">
                         <CheckIcon className="h-5 w-5 text-blue-600 mr-2" />
-                        <span className="text-sm font-medium text-blue-600">Selected</span>
+                        <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Selected</span>
                       </div>
                     )}
                   </div>
@@ -279,10 +289,10 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
             </div>
 
             {setupData.selectedProvider && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
                 <div className="flex items-center">
                   <CheckIcon className="h-5 w-5 text-green-600 mr-2" />
-                  <span className="text-green-800">
+                  <span className="text-green-800 dark:text-green-400">
                     Selected: {providers[setupData.selectedProvider as keyof typeof providers]?.name}
                   </span>
                 </div>
@@ -296,34 +306,35 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                 Step 2: Choose Model & API Key
               </h2>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 Select specific model and securely input API credentials
               </p>
             </div>
 
             {/* Model Selection */}
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Available Models for {providers[setupData.selectedProvider as keyof typeof providers]?.name}
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {availableModels.map((model) => (
                   <button
                     key={model}
                     onClick={() => handleModelSelect(model)}
                     className={`p-4 text-left border rounded-lg transition-all hover:shadow-sm ${
                       setupData.selectedModel === model
-                        ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-200 dark:ring-blue-700'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800'
                     }`}
+                    title={model} // Add tooltip for long model names
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-gray-900">{model}</span>
+                      <span className="font-medium text-gray-900 dark:text-white truncate pr-2 max-w-[200px]">{model}</span>
                       {setupData.selectedModel === model && (
-                        <CheckIcon className="h-4 w-4 text-blue-600" />
+                        <CheckIcon className="h-4 w-4 text-blue-600 flex-shrink-0" />
                       )}
                     </div>
                   </button>
@@ -333,13 +344,13 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
 
             {/* API Key Input */}
             {setupData.selectedModel && (
-              <div className="bg-white p-6 rounded-lg border border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   API Credentials
                 </h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       {providers[setupData.selectedProvider as keyof typeof providers]?.name} API Key
                     </label>
                     <div className="relative">
@@ -348,7 +359,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
                         value={setupData.apiKeys[setupData.selectedProvider] || ''}
                         onChange={(e) => handleApiKeyInput(e.target.value)}
                         placeholder={`Enter your ${providers[setupData.selectedProvider as keyof typeof providers]?.name} API key`}
-                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                       />
                       <button
                         type="button"
@@ -356,22 +367,22 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
                         className="absolute inset-y-0 right-0 pr-3 flex items-center"
                       >
                         {showApiKey ? (
-                          <EyeSlashIcon className="h-4 w-4 text-gray-400" />
+                          <EyeSlashIcon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                         ) : (
-                          <EyeIcon className="h-4 w-4 text-gray-400" />
+                          <EyeIcon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                         )}
                       </button>
                     </div>
                   </div>
                   
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
                     <div className="flex items-start">
                       <div className="flex-shrink-0">
                         <WifiIcon className="h-5 w-5 text-blue-600 mt-0.5" />
                       </div>
                       <div className="ml-3">
-                        <h4 className="text-sm font-medium text-blue-900">Security Notice</h4>
-                        <div className="text-sm text-blue-800 mt-1">
+                        <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">Security Notice</h4>
+                        <div className="text-sm text-blue-800 dark:text-blue-200 mt-1">
                           <p>• API keys are encrypted and stored securely</p>
                           <p>• Connection will be validated in the next step</p>
                           <p>• Keys are never shared or logged</p>
@@ -390,47 +401,47 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                 Step 3: Validate Connection
               </h2>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 Test API connection and verify permissions
               </p>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Configuration Summary
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
                     Provider
                   </h4>
-                  <p className="text-lg font-medium text-gray-900">
+                  <p className="text-lg font-medium text-gray-900 dark:text-white">
                     {providers[setupData.selectedProvider as keyof typeof providers]?.name}
                   </p>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
                     Model
                   </h4>
-                  <p className="text-lg font-medium text-gray-900">
+                  <p className="text-lg font-medium text-gray-900 dark:text-white break-words" title={setupData.selectedModel}>
                     {setupData.selectedModel}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Connection Test
                 </h3>
                 <button
                   onClick={testConnection}
                   disabled={connectionStatus === 'testing'}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  className="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
                   {connectionStatus === 'testing' ? (
                     <>
@@ -447,11 +458,11 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
               </div>
 
               {connectionStatus === 'success' && (
-                <div className="flex items-center p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
                   <CheckIcon className="h-5 w-5 text-green-600 mr-3" />
                   <div>
-                    <p className="text-green-800 font-medium">Connection Successful!</p>
-                    <p className="text-green-700 text-sm">
+                    <p className="text-green-800 dark:text-green-400 font-medium">Connection Successful!</p>
+                    <p className="text-green-700 dark:text-green-300 text-sm">
                       {connectionMessage || 'API key validated and permissions confirmed'}
                     </p>
                   </div>
@@ -459,18 +470,18 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
               )}
 
               {connectionStatus === 'error' && (
-                <div className="flex items-center p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
                   <XCircleIcon className="h-5 w-5 text-red-600 mr-3" />
                   <div>
-                    <p className="text-red-800 font-medium">Connection Failed</p>
-                    <p className="text-red-700 text-sm">{connectionError}</p>
+                    <p className="text-red-800 dark:text-red-400 font-medium">Connection Failed</p>
+                    <p className="text-red-700 dark:text-red-300 text-sm">{connectionError}</p>
                   </div>
                 </div>
               )}
 
               {connectionStatus === 'idle' && (
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                  <p className="text-gray-600">
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <p className="text-gray-600 dark:text-gray-400">
                     Click "Test Connection" to validate your API key and verify permissions.
                   </p>
                 </div>
@@ -484,10 +495,10 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                 Step 4: Configure Assessment
               </h2>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 Set parameters and launch red team testing
               </p>
             </div>
@@ -506,15 +517,15 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
       <div className="max-w-4xl mx-auto px-4">
         {/* Progress Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Setup Red Team Assessment</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Setup Red Team Assessment</h1>
             <button
               onClick={onCancel}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
             >
               Cancel
             </button>
@@ -527,7 +538,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
                 <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
                   currentStep >= step.id
                     ? 'border-blue-600 bg-blue-600 text-white'
-                    : 'border-gray-300 bg-white text-gray-400'
+                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-400 dark:text-gray-500'
                 }`}>
                   {currentStep > step.id ? (
                     <CheckIcon className="h-5 w-5" />
@@ -537,15 +548,15 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
                 </div>
                 <div className="ml-3 flex-1">
                   <p className={`text-sm font-medium ${
-                    currentStep >= step.id ? 'text-blue-600' : 'text-gray-500'
+                    currentStep >= step.id ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
                   }`}>
                     {step.title}
                   </p>
-                  <p className="text-xs text-gray-500">{step.description}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{step.description}</p>
                 </div>
                 {index < steps.length - 1 && (
                   <div className={`w-12 h-0.5 mx-4 ${
-                    currentStep > step.id ? 'bg-blue-600' : 'bg-gray-300'
+                    currentStep > step.id ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
                   }`} />
                 )}
               </div>
@@ -554,7 +565,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
         </div>
 
         {/* Step Content */}
-        <div className="bg-white rounded-lg border border-gray-200 p-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8">
           {getStepContent()}
         </div>
 
@@ -563,7 +574,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
           <button
             onClick={prevStep}
             disabled={currentStep === 1}
-            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            className="px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
             <ChevronLeftIcon className="h-4 w-4 mr-2" />
             Previous
@@ -576,7 +587,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
                 estimatedTimePerPrompt: averageResponseTime
               })}
               disabled={!canProceedToNext()}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              className="px-6 py-3 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
               Launch Assessment
               <ChevronRightIcon className="h-4 w-4 ml-2" />
@@ -585,7 +596,7 @@ const SetupWizard: React.FC<SetupWizardProps> = ({ onSetupComplete, onCancel }) 
             <button
               onClick={nextStep}
               disabled={!canProceedToNext()}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              className="px-6 py-3 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
               Next
               <ChevronRightIcon className="h-4 w-4 ml-2" />

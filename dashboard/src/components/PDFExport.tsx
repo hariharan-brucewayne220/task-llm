@@ -199,21 +199,6 @@ const PDFExport: React.FC<PDFExportProps> = ({
           pdf.addImage(chartImages.modelRiskDistributionChart, 'PNG', 20, yPosition, imgWidth, imgHeight);
         }
         
-        // Scatter Plot Analysis
-        if (chartImages.modelScatterChart) {
-          pdf.addPage();
-          yPosition = 20;
-          
-          pdf.setFontSize(16);
-          pdf.setFont('helvetica', 'bold');
-          pdf.text('Scatter Plot Analysis', 20, yPosition);
-          yPosition += 15;
-          
-          const imgWidth = pageWidth - 40;
-          const imgHeight = (imgWidth * 3) / 4;
-          
-          pdf.addImage(chartImages.modelScatterChart, 'PNG', 20, yPosition, imgWidth, imgHeight);
-        }
         
         // Additional Risk Analysis
         if (chartImages.modelRiskDistributionChart) {
@@ -266,7 +251,7 @@ const PDFExport: React.FC<PDFExportProps> = ({
           }
           
           pdf.setFont('helvetica', 'bold');
-          pdf.text(`${model.provider || 'Unknown'}/${model.model_name || model.model || 'Unknown'}`, 20, yPosition);
+          pdf.text(`${model.model_name || model.model || 'Unknown'}`, 20, yPosition);
           yPosition += 7;
           
           pdf.setFont('helvetica', 'normal');
@@ -298,35 +283,88 @@ const PDFExport: React.FC<PDFExportProps> = ({
         pdf.setFont('helvetica', 'normal');
         
         testResults.slice(0, 20).forEach((result, index) => {
-          if (yPosition > pageHeight - 30) {
+          // Check if we need a new page for this test result
+          if (yPosition > pageHeight - 80) {
             pdf.addPage();
             yPosition = 20;
           }
           
+          // Test header
           pdf.setFont('helvetica', 'bold');
-          pdf.text(`Test ${index + 1}: ${result.category}`, 20, yPosition);
-          yPosition += 5;
+          pdf.setFontSize(10);
+          pdf.text(`Test ${index + 1}: ${result.category.charAt(0).toUpperCase() + result.category.slice(1)}`, 20, yPosition);
+          yPosition += 8;
           
+          // Test metrics
           pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(8);
           const resultDetails = [
-            `  Risk Level: ${result.risk_level}`,
-            `  Vulnerability Score: ${result.vulnerability_score}/10`,
-            `  Safeguard Triggered: ${result.safeguard_triggered ? 'Yes' : 'No'}`,
-            `  Response Time: ${result.response_time}s`
+            `Risk Level: ${result.risk_level.charAt(0).toUpperCase() + result.risk_level.slice(1)}`,
+            `Vulnerability Score: ${(result.vulnerability_score || 0).toFixed(2)}/10`,
+            `Safeguard Triggered: ${result.safeguard_triggered ? 'Yes' : 'No'}`,
+            `Response Time: ${(result.response_time || 0).toFixed(2)}s`
           ];
           
           resultDetails.forEach(detail => {
-            pdf.text(detail, 20, yPosition);
+            pdf.text(`• ${detail}`, 25, yPosition);
             yPosition += 4;
           });
           
           yPosition += 3;
+          
+          // Prompt section
+          if (result.prompt) {
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('Prompt:', 25, yPosition);
+            yPosition += 4;
+            
+            pdf.setFont('helvetica', 'normal');
+            const promptLines = pdf.splitTextToSize(result.prompt, pageWidth - 50);
+            promptLines.forEach((line: string) => {
+              if (yPosition > pageHeight - 20) {
+                pdf.addPage();
+                yPosition = 20;
+              }
+              pdf.text(line, 30, yPosition);
+              yPosition += 4;
+            });
+            yPosition += 3;
+          }
+          
+          // Response section
+          const responseText = result.response_preview || result.response || 'No response available';
+          if (responseText && responseText !== 'No response available') {
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('Response:', 25, yPosition);
+            yPosition += 4;
+            
+            pdf.setFont('helvetica', 'normal');
+            const responseLines = pdf.splitTextToSize(responseText, pageWidth - 50);
+            responseLines.forEach((line: string) => {
+              if (yPosition > pageHeight - 20) {
+                pdf.addPage();
+                yPosition = 20;
+              }
+              pdf.text(line, 30, yPosition);
+              yPosition += 4;
+            });
+            yPosition += 5;
+          }
+          
+          // Add separator line between tests
+          if (index < testResults.slice(0, 20).length - 1) {
+            pdf.setDrawColor(200, 200, 200);
+            pdf.line(20, yPosition, pageWidth - 20, yPosition);
+            yPosition += 8;
+          }
         });
       }
       
-      // Assessment Summary Section
+      // Assessment Summary Section - Always on new page
       if (metrics) {
-        yPosition += 10;
+        pdf.addPage();
+        yPosition = 20;
+        
         pdf.setFontSize(14);
         pdf.setFont('helvetica', 'bold');
         pdf.text('Assessment Summary', 20, yPosition);
@@ -387,16 +425,6 @@ const PDFExport: React.FC<PDFExportProps> = ({
         </svg>
         <span>{isGenerating ? 'Generating PDF...' : 'Export Full Report (PDF)'}</span>
       </button>
-      
-      <div className="text-sm text-gray-600 text-center max-w-md">
-        <p>Generate comprehensive PDF report with:</p>
-        <ul className="list-disc list-inside mt-2 space-y-1">
-          <li>Executive summary and metrics</li>
-          <li>Model comparison analysis</li>
-          <li>Detailed test results</li>
-          <li>Assessment findings and recommendations</li>
-        </ul>
-      </div>
     </div>
   );
 };

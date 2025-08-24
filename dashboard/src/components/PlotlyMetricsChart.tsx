@@ -78,6 +78,13 @@ const PlotlyMetricsChart: React.FC<PlotlyMetricsChartProps> = ({
     );
   }
 
+  // Debug: Log metrics to check advanced metrics availability
+  console.log('PlotlyMetricsChart - Full metrics object:', metrics);
+  console.log('Advanced metrics available?', metrics.advanced_metrics_available);
+  console.log('BLEU score:', metrics.bleu_score_factual);
+  console.log('Sentiment bias score:', metrics.sentiment_bias_score);
+  console.log('Consistency score:', metrics.consistency_score);
+
   // Risk Distribution Radial Chart Data
   const riskDistribution = metrics.risk_distribution;
   const total = Object.values(riskDistribution).reduce((sum, count) => sum + count, 0);
@@ -178,7 +185,7 @@ const PlotlyMetricsChart: React.FC<PlotlyMetricsChartProps> = ({
       font: { size: 16, family: 'Inter, sans-serif' }
     },
     font: { family: 'Inter, sans-serif' },
-    margin: { t: 50, b: 80, l: 60, r: 60 },
+    margin: { t: 80, b: 80, l: 60, r: 60 },
     xaxis: {
       title: 'Categories',
       tickangle: -45
@@ -196,8 +203,8 @@ const PlotlyMetricsChart: React.FC<PlotlyMetricsChartProps> = ({
     },
     legend: {
       orientation: 'h',
-      yanchor: 'bottom',
-      y: 1.02,
+      yanchor: 'top',
+      y: 1.15,
       xanchor: 'center',
       x: 0.5
     },
@@ -262,6 +269,68 @@ const PlotlyMetricsChart: React.FC<PlotlyMetricsChartProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Advanced Metrics Section */}
+      {console.log('Rendering advanced metrics section? Condition:', metrics.advanced_metrics_available)}
+      {metrics.advanced_metrics_available && (
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Advanced Metrics
+            <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-normal">
+              NLTK + Transformers Active
+            </span>
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            {metrics.sentiment_bias_score !== undefined && metrics.sentiment_bias_score !== null && (
+              <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                <h4 className="font-medium text-purple-900 mb-2">Sentiment Bias</h4>
+                <div className="text-2xl font-bold text-purple-800">
+                  {metrics.sentiment_bias_score.toFixed(2)}
+                </div>
+                <p className="text-xs text-purple-700 mt-1">
+                  VADER sentiment analysis for bias detection
+                </p>
+                <div className="mt-2 text-xs text-purple-600">
+                  <strong>Scale:</strong> 0-10 (Lower = Less Biased)
+                </div>
+              </div>
+            )}
+
+            {metrics.consistency_score !== undefined && metrics.consistency_score !== null && (
+              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                <h4 className="font-medium text-green-900 mb-2">Consistency Score</h4>
+                <div className="text-2xl font-bold text-green-800">
+                  {metrics.consistency_score.toFixed(2)}
+                </div>
+                <p className="text-xs text-green-700 mt-1">
+                  Response consistency via sentence embeddings
+                </p>
+                <div className="mt-2 text-xs text-green-600">
+                  <strong>Scale:</strong> 0-10 (Higher = More Consistent)
+                </div>
+              </div>
+            )}
+          </div>
+
+          {metrics.advanced_metrics_note && (
+            <div className="mt-4 p-3 bg-green-100 rounded-lg border border-green-200">
+              <p className="text-sm text-green-800">
+                {metrics.advanced_metrics_note}
+              </p>
+            </div>
+          )}
+
+          {metrics.advanced_metrics_error && (
+            <div className="mt-4 p-3 bg-red-100 rounded-lg border border-red-200">
+              <p className="text-sm text-red-800">
+                Advanced metrics error: {metrics.advanced_metrics_error}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

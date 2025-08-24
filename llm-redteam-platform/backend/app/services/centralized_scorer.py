@@ -20,7 +20,7 @@ class PromptFooScorer:
     
     def __init__(self, config_path: str = None):
         """Initialize the scorer with PromptFoo configuration."""
-        self.config_path = config_path or "llm-redteam-platform/promptfooconfig.yaml"
+        self.config_path = config_path or "../promptfooconfig.yaml"
         self.config = self._load_config()
         self.assertions = self._load_assertions()
         

@@ -16,17 +16,20 @@ logger = logging.getLogger(__name__)
 class AssessmentService:
     """Service for managing red team assessment execution."""
     
-    _running_assessments = {}  # Track running assessments
+    _running_assessments = {}  # Track running assessments: {id: {'running': bool, 'paused': bool}}
+    _paused_assessments = {}   # Track paused assessments
     
     @classmethod
     def run_assessment_async(cls, assessment_id: int, api_key: str = None):
         """Start an assessment in a background thread."""
-        if assessment_id in cls._running_assessments:
+        if assessment_id in cls._running_assessments and cls._running_assessments[assessment_id].get('running', False):
             logger.warning(f"Assessment {assessment_id} is already running")
             return
             
         # Mark assessment as running
-        cls._running_assessments[assessment_id] = True
+        cls._running_assessments[assessment_id] = {'running': True, 'paused': False}
+        if assessment_id in cls._paused_assessments:
+            del cls._paused_assessments[assessment_id]
         
         # Use SocketIO background task instead of threading
         from app import socketio
@@ -35,11 +38,82 @@ class AssessmentService:
         socketio.start_background_task(cls._execute_assessment, assessment_id, api_key, current_app._get_current_object())
         
     @classmethod
+    def pause_assessment(cls, assessment_id: int):
+        """Pause a running assessment."""
+        if assessment_id in cls._running_assessments and cls._running_assessments[assessment_id].get('running', False):
+            cls._running_assessments[assessment_id]['paused'] = True
+            cls._paused_assessments[assessment_id] = True
+            logger.info(f"Pausing assessment {assessment_id}")
+            return True
+        return False
+    
+    @classmethod
+    def resume_assessment(cls, assessment_id: int):
+        """Resume a paused assessment."""
+        if assessment_id in cls._running_assessments and cls._running_assessments[assessment_id].get('paused', False):
+            cls._running_assessments[assessment_id]['paused'] = False
+            if assessment_id in cls._paused_assessments:
+                del cls._paused_assessments[assessment_id]
+            logger.info(f"Resuming assessment {assessment_id}")
+            return True
+        else:
+            # Assessment might have been lost from memory - check if it's still running in DB
+            from app.models import Assessment
+            assessment = Assessment.query.get(assessment_id)
+            if assessment and assessment.status == 'running':
+                logger.warning(f"Assessment {assessment_id} not in memory but marked as running in DB. Cannot resume - execution thread may have ended.")
+                return False
+            else:
+                logger.error(f"Assessment {assessment_id} not found or not in paused state. Current state: {cls._running_assessments.get(assessment_id, 'Not found')}")
+                return False
+    
+    @classmethod
     def stop_assessment(cls, assessment_id: int):
         """Stop a running assessment."""
         if assessment_id in cls._running_assessments:
-            cls._running_assessments[assessment_id] = False
+            cls._running_assessments[assessment_id]['running'] = False
+            cls._running_assessments[assessment_id]['paused'] = False
+            if assessment_id in cls._paused_assessments:
+                del cls._paused_assessments[assessment_id]
             logger.info(f"Stopping assessment {assessment_id}")
+            return True
+        return False
+    
+    @classmethod
+    def get_assessment_state(cls, assessment_id: int):
+        """Get the current state of an assessment."""
+        if assessment_id in cls._running_assessments:
+            state = cls._running_assessments[assessment_id]
+            if not state['running']:
+                return 'stopped'
+            elif state['paused']:
+                return 'paused'
+            else:
+                return 'running'
+        
+        # Check database status if not in memory
+        from app.models import Assessment
+        assessment = Assessment.query.get(assessment_id)
+        if assessment:
+            return assessment.status
+        return 'not_found'
+    
+    @classmethod
+    def debug_assessment_state(cls, assessment_id: int):
+        """Debug method to check all assessment states."""
+        memory_state = cls._running_assessments.get(assessment_id, 'Not in memory')
+        paused_state = assessment_id in cls._paused_assessments
+        
+        from app.models import Assessment
+        assessment = Assessment.query.get(assessment_id)
+        db_state = assessment.status if assessment else 'Not in database'
+        
+        return {
+            'memory_state': memory_state,
+            'is_paused': paused_state,
+            'db_state': db_state,
+            'assessment_exists': assessment is not None
+        }
     
     @classmethod
     def _execute_assessment(cls, assessment_id: int, api_key: str = None, app=None):
@@ -55,18 +129,9 @@ class AssessmentService:
                     
                 logger.info(f"Starting assessment execution: {assessment_id}")
                 
-                # Use provided API key or fallback to environment
+                # Require API key from caller (UI)
                 if not api_key:
-                    import os
-                    api_key_map = {
-                        'openai': os.getenv('OPENAI_API_KEY'),
-                        'anthropic': os.getenv('ANTHROPIC_API_KEY'),
-                        'google': os.getenv('GOOGLE_API_KEY')
-                    }
-                    api_key = api_key_map.get(assessment.llm_provider)
-                
-                if not api_key:
-                    error_msg = f"No API key provided for provider: {assessment.llm_provider}"
+                    error_msg = f"API key required for provider: {assessment.llm_provider}"
                     logger.error(error_msg)
                     # Mark assessment as failed
                     assessment.status = 'failed'
@@ -103,8 +168,22 @@ class AssessmentService:
                 completed_prompts = 0
                 for i, prompt in enumerate(all_prompts):
                     # Check if assessment should stop
-                    if not cls._running_assessments.get(assessment_id, False):
+                    assessment_state = cls._running_assessments.get(assessment_id, {'running': False, 'paused': False})
+                    if not assessment_state.get('running', False):
                         logger.info(f"Assessment {assessment_id} stopped by user")
+                        break
+                    
+                    # Check if assessment is paused
+                    while assessment_state.get('paused', False):
+                        logger.info(f"Assessment {assessment_id} is paused, waiting...")
+                        time.sleep(1)
+                        assessment_state = cls._running_assessments.get(assessment_id, {'running': False, 'paused': False})
+                        if not assessment_state.get('running', False):
+                            logger.info(f"Assessment {assessment_id} stopped while paused")
+                            break
+                    
+                    # Double-check if we should stop after pause
+                    if not assessment_state.get('running', False):
                         break
                         
                     try:
@@ -313,9 +392,11 @@ class AssessmentService:
                     db.session.commit()
                     
             finally:
-                # Clean up
+                # Clean up running assessments tracking
                 if assessment_id in cls._running_assessments:
                     del cls._running_assessments[assessment_id]
+                if assessment_id in cls._paused_assessments:
+                    del cls._paused_assessments[assessment_id]
     
     @classmethod
     def _execute_prompt(cls, assessment: Assessment, prompt: Prompt, llm_client) -> Dict:
@@ -331,6 +412,19 @@ class AssessmentService:
             )
             
             response_time = time.time() - start_time
+            
+            # Check if the response was successful
+            if not response.get('success', False):
+                error_msg = response.get('error', 'Unknown error')
+                logger.error(f"LLM API call failed for prompt {prompt.id}: {error_msg}")
+                return {
+                    'response_text': f"Error: {error_msg}",
+                    'response_time': response_time,
+                    'vulnerability_score': 0,
+                    'risk_level': 'low',
+                    'safeguard_triggered': True,
+                    'error': error_msg
+                }
             
             # Calculate vulnerability score with validation
             try:
