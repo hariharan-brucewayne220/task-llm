@@ -1,43 +1,42 @@
 # LLM Red Team Platform
 
-A comprehensive web application for automated red teaming and security assessment of Large Language Models (LLMs). This platform enables organizations to identify vulnerabilities, biases, and security risks in their AI systems through systematic testing and real-time monitoring.
+A comprehensive web application for automated red teaming and security assessment of Large Language Models (LLMs). This platform enables organizations to identify vulnerabilities, biases, and security risks in LLMs through systematic testing and real-time monitoring.
 
-## 🎯 Overview
+## Overview
 
 This defensive security tool performs automated vulnerability assessments on LLMs across multiple attack vectors including jailbreaks, bias detection, hallucination testing, privacy leakage, and manipulation attempts. The platform provides real-time monitoring, comprehensive reporting, and actionable security insights.
 
-## ✨ Key Features
+## Key Features
 
-### 🔒 Multi-LLM Provider Support
-- **OpenAI**: GPT-3.5-turbo, GPT-4, GPT-4-turbo
-- **Anthropic**: Claude 3.5 Sonnet, Claude 3 Haiku
-- **Google**: Gemini Pro, Gemini Pro Vision
-- **Hugging Face**: Llama, Mistral, and other open-source models
+### Multi-LLM Provider Support
+- **OpenAI**: GPT-3.5-turbo, GPT-4, GPT-4o,GPT-4o-mini etc
+- **Anthropic**: Claude 3.5 Sonnet, Claude 3 Haiku etc
+- **Google**: Gemini 
 
-### 🚀 Real-Time Assessment
+### Real-Time Assessment
 - **WebSocket Integration**: Live progress updates and result streaming
 - **Interactive Dashboard**: Real-time visualization of attack patterns
 - **Progress Monitoring**: Track assessment completion with detailed status
 
-### 📊 Comprehensive Analysis
+### Comprehensive Analysis
 - **Vulnerability Categories**: Jailbreak, Bias, Hallucination, Privacy, Manipulation
 - **Automated Scoring**: 0-10 vulnerability scores with clear rubrics
 - **Advanced Metrics**: BLEU scores, sentiment analysis, consistency scoring
 - **Risk Prioritization**: Findings categorized by severity level
 
-### 📈 Reporting & Visualization
+### Reporting & Visualization
 - **Interactive Charts**: Plotly-powered visualizations
 - **PDF Export**: Comprehensive assessment reports
 - **Historical Tracking**: Compare assessments over time
 - **Model Comparisons**: Side-by-side security analysis
 
-### ⚡ Advanced Capabilities
+### Advanced Capabilities
 - **Scheduled Assessments**: Automated recurring security tests
 - **Custom Prompts**: Upload and test organization-specific scenarios
 - **API Integration**: RESTful endpoints for CI/CD integration
 - **Secure Credential Management**: Encrypted storage of API keys
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ├── dashboard/                 # Next.js Frontend
@@ -57,7 +56,7 @@ This defensive security tool performs automated vulnerability assessments on LLM
 │       └── red_team_prompts/ # Attack vectors & test cases
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Node.js 18+ and npm
@@ -100,7 +99,7 @@ GOOGLE_API_KEY=your_google_key
 HUGGINGFACE_API_TOKEN=your_hf_token
 ```
 
-## 📱 Usage
+## Usage
 
 ### Web Dashboard
 1. Navigate to `http://localhost:3000`
@@ -122,41 +121,41 @@ HUGGINGFACE_API_TOKEN=your_hf_token
 - `test_result` - Individual test completion
 - `assessment_complete` - Final results available
 
-## 🧪 Testing Methodologies
+## Testing Methodologies
 
 ### Vulnerability Categories
 
-#### 🔓 Jailbreak Testing
+#### Jailbreak Testing
 Tests the model's ability to resist prompt injection and instruction bypassing attempts.
 - Safety guardrail circumvention
 - System prompt manipulation
 - Role-playing attacks
 
-#### ⚖️ Bias Detection
+#### Bias Detection
 Evaluates the model for social, cultural, and demographic biases.
 - Profession-based stereotypes
 - Gender and racial bias
 - Cultural assumptions
 
-#### 🎭 Hallucination Assessment
+#### Hallucination Assessment
 Checks for factual accuracy and fabricated information.
 - False fact generation
 - Confidence in incorrect information
 - Source attribution accuracy
 
-#### 🔐 Privacy Evaluation
+#### Privacy Evaluation
 Tests for potential data leakage and privacy violations.
 - Personal information disclosure
 - Training data memorization
 - Sensitive data handling
 
-#### 🎯 Manipulation Resistance
+#### Manipulation Resistance
 Assesses susceptibility to persuasive and deceptive prompts.
 - Social engineering attempts
 - Misinformation generation
 - Emotional manipulation
 
-## 📊 Metrics & Scoring
+##  Metrics & Scoring
 
 ### Core Metrics
 - **Safeguard Success Rate**: Percentage of blocked unsafe responses
@@ -165,12 +164,11 @@ Assesses susceptibility to persuasive and deceptive prompts.
 - **Response Length Analysis**: Verbosity and detail metrics
 
 ### Advanced Analytics
-- **BLEU Score**: Factual accuracy comparison
 - **Sentiment Analysis**: Bias detection in responses  
 - **Consistency Score**: Multi-turn conversation analysis
 - **Risk Assessment**: Prioritized vulnerability ranking
 
-## 📋 Assessment Reports
+## Assessment Reports
 
 ### Automated Analysis Includes:
 - **Strengths**: Security features that performed well
@@ -179,7 +177,7 @@ Assesses susceptibility to persuasive and deceptive prompts.
 - **Trend Analysis**: Performance over time
 - **Compliance Status**: Industry standard adherence
 
-## 🔧 Technical Implementation
+## Technical Implementation
 
 ### Frontend Stack
 - **Next.js 14**: React framework with App Router
@@ -201,31 +199,6 @@ Assesses susceptibility to persuasive and deceptive prompts.
 - **Pandas**: Data manipulation and analysis
 - **Asyncio**: Concurrent API request handling
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🔐 Security & Compliance
-
-- **Secure API Key Management**: Encrypted storage and transmission
-- **Rate Limiting**: Built-in protection against API abuse
-- **Audit Logging**: Comprehensive activity tracking
-- **Data Privacy**: No sensitive data storage or logging
-- **Defensive Focus**: Designed exclusively for security assessment
-
-## 📞 Support
-
-For questions, issues, or feature requests:
-- Open an issue on GitHub
-- Contact: [Your Contact Information]
 
 ## 🙏 Acknowledgments
 
